@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "routes": [
+    {
+      "src": "/api/health",
+      "dest": "/api/health.js"
+    },
+    {
+      "src": "/api/state",
+      "dest": "/api/state.js"
+    },
+    {
+      "src": "/api/register-player",
+      "dest": "/api/register-player.js"
+    },
+    {
+      "src": "/api/player-score",
+      "dest": "/api/player-score.js"
+    },
+    {
+      "src": "/api/playoff-player-score",
+      "dest": "/api/playoff-player-score.js"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
