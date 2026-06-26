@@ -5,6 +5,8 @@ const EMPTY_BRACKET = {
   roundOf16: [],
   quarterFinals: [],
   semiFinals: [],
+  fifthPlaceSemiFinals: [],
+  fifthPlaceFinal: null,
   final12: null,
   final34: null,
   winners: [],
@@ -28,6 +30,8 @@ function createEmptyBracket() {
     roundOf16: [],
     quarterFinals: [],
     semiFinals: [],
+    fifthPlaceSemiFinals: [],
+    fifthPlaceFinal: null,
     final12: null,
     final34: null,
     winners: [],
@@ -84,7 +88,7 @@ const normalizePasswordProtectionEnabled = (value) => (typeof value === 'boolean
 
 const normalizeCompetitionState = (value) => ({
   playoffMode: [32, 16, 8, 4].includes(Number(value?.playoffMode)) ? Number(value.playoffMode) : 16,
-  playoffStage: ['none', 'roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final'].includes(value?.playoffStage)
+  playoffStage: ['none', 'roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final', 'fifthPlace'].includes(value?.playoffStage)
     ? value.playoffStage
     : 'none',
   playoffFinalRounds: normalizePlayoffFinalRounds(value?.playoffFinalRounds),
@@ -96,11 +100,13 @@ const hasBracketData = (bracket) =>
     bracket &&
       (bracket.final12 ||
         bracket.final34 ||
+        bracket.fifthPlaceFinal ||
         bracket.winners?.length ||
         bracket.roundOf32?.length ||
         bracket.roundOf16?.length ||
         bracket.quarterFinals?.length ||
-        bracket.semiFinals?.length),
+        bracket.semiFinals?.length ||
+        bracket.fifthPlaceSemiFinals?.length),
   )
 
 const normalizeCompetitionDivisions = (value, legacy = {}) => {

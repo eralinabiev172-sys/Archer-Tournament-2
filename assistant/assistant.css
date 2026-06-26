@@ -182,6 +182,15 @@
   max-width: 1240px;
 }
 
+.assistant-page .bracket-grid {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  justify-content: start;
+}
+
 .assistant-toolbar {
   display: grid;
   gap: 14px;
@@ -355,6 +364,13 @@
   flex-wrap: wrap;
 }
 
+.assistant-fifth-place-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: -4px;
+}
+
 .assistant-stage-banner {
   justify-content: flex-start;
 }
@@ -384,6 +400,10 @@
 
 .assistant-batch-submit {
   min-width: min(100%, 320px);
+}
+
+.assistant-forward-button {
+  min-width: min(100%, 180px);
 }
 
 .assistant-link-button {
@@ -484,11 +504,20 @@
   }
 
   .assistant-submit-bar {
-    justify-content: stretch;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+    padding-bottom: 6px;
   }
 
   .assistant-save-drafts,
-  .assistant-batch-submit {
-    width: 100%;
+  .assistant-batch-submit,
+  .assistant-forward-button {
+    flex: 0 0 auto;
+    width: auto;
   }
 }

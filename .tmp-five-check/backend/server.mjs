@@ -212,39 +212,26 @@ const normalizeCompetitionDivisions = (value, legacy = {}) => {
   return defaults
 }
 
-const findActivePlayoffMatch = (bracket, playoffStage, playerId, explicitStageKey = null) => {
-  const stageKey = explicitStageKey || playoffStage
-
-  if (stageKey === 'final') {
+const findActivePlayoffMatch = (bracket, playoffStage, playerId) => {
+  if (playoffStage === 'final') {
     const finals = [bracket.final12, bracket.final34].filter(Boolean)
     return finals.find((match) => match?.p1?.id === playerId || match?.p2?.id === playerId) || null
   }
 
-  if (stageKey === 'fifthPlaceFinal') {
-    return bracket.fifthPlaceFinal?.p1?.id === playerId || bracket.fifthPlaceFinal?.p2?.id === playerId
-      ? bracket.fifthPlaceFinal
-      : null
-  }
-
-  if (stageKey === 'fifthPlaceSemiFinals') {
-    const fifthPlaceMatches = bracket.fifthPlaceSemiFinals || []
-    return fifthPlaceMatches.find((match) => match?.p1?.id === playerId || match?.p2?.id === playerId) || null
-  }
-
-  if (stageKey === 'fifthPlace') {
+  if (playoffStage === 'fifthPlace') {
     const fifthPlaceMatches = bracket.fifthPlaceFinal ? [bracket.fifthPlaceFinal] : (bracket.fifthPlaceSemiFinals || [])
     return fifthPlaceMatches.find((match) => match?.p1?.id === playerId || match?.p2?.id === playerId) || null
   }
 
-  if (!PLAYOFF_SUBMISSION_STAGES.includes(stageKey)) {
+  if (!PLAYOFF_SUBMISSION_STAGES.includes(playoffStage)) {
     return null
   }
 
-  const stageMatches = Array.isArray(bracket?.[stageKey]) ? bracket[stageKey] : []
+  const stageMatches = Array.isArray(bracket?.[playoffStage]) ? bracket[playoffStage] : []
   return stageMatches.find((match) => match?.p1?.id === playerId || match?.p2?.id === playerId) || null
 }
 
-const resolveCompetitionDivisionIdForPlayer = (state, playerId, preferredDivisionId = null, explicitStageKey = null) => {
+const resolveCompetitionDivisionIdForPlayer = (state, playerId, preferredDivisionId = null) => {
   const divisionIds = [
     preferredDivisionId,
     state?.playoffDivision,
@@ -255,7 +242,7 @@ const resolveCompetitionDivisionIdForPlayer = (state, playerId, preferredDivisio
 
   for (const divisionId of divisionIds) {
     const divisionState = normalizeCompetitionState(state?.competitionDivisions?.[divisionId])
-    if (findActivePlayoffMatch(divisionState.bracket, divisionState.playoffStage, playerId, explicitStageKey)) {
+    if (findActivePlayoffMatch(divisionState.bracket, divisionState.playoffStage, playerId)) {
       return divisionId
     }
   }
@@ -461,12 +448,9 @@ const submitPlayoffPlayerScore = async (payload) => {
   }
 
   const preferredDivisionId = ['all', 'male', 'female'].includes(payload.divisionId) ? payload.divisionId : null
-  const explicitStageKey = ['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final', 'fifthPlace', 'fifthPlaceSemiFinals', 'fifthPlaceFinal'].includes(payload.stageKey)
-    ? payload.stageKey
-    : null
-  const divisionId = resolveCompetitionDivisionIdForPlayer(currentState, playerId, preferredDivisionId, explicitStageKey)
+  const divisionId = resolveCompetitionDivisionIdForPlayer(currentState, playerId, preferredDivisionId)
   const divisionState = normalizeCompetitionState(currentState.competitionDivisions?.[divisionId])
-  const activeMatch = findActivePlayoffMatch(divisionState.bracket, divisionState.playoffStage, playerId, explicitStageKey)
+  const activeMatch = findActivePlayoffMatch(divisionState.bracket, divisionState.playoffStage, playerId)
   if (!activeMatch) {
     throw new Error('Сиз үчүн ачык плей-офф беттеш табылган жок.')
   }

@@ -6,6 +6,8 @@ const EMPTY_BRACKET = {
   roundOf16: [],
   quarterFinals: [],
   semiFinals: [],
+  fifthPlaceSemiFinals: [],
+  fifthPlaceFinal: null,
   final12: null,
   final34: null,
   winners: [],
@@ -21,7 +23,7 @@ const PLAYOFF_DIVISION_META_KEY = '__playoffDivision'
 const PLAYOFF_FINAL_ROUNDS_META_KEY = '__playoffFinalRounds'
 const COMPETITION_DIVISIONS_META_KEY = '__competitionDivisions'
 const PASSWORD_PROTECTION_META_KEY = '__passwordProtectionEnabled'
-const PLAYOFF_SUBMISSION_STAGES = ['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final']
+const PLAYOFF_SUBMISSION_STAGES = ['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final', 'fifthPlace']
 const PLAYOFF_STAGE_KEYS_BY_MODE = {
   32: ['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals'],
   16: ['roundOf16', 'quarterFinals', 'semiFinals'],
@@ -35,6 +37,8 @@ function createEmptyBracket() {
     roundOf16: [],
     quarterFinals: [],
     semiFinals: [],
+    fifthPlaceSemiFinals: [],
+    fifthPlaceFinal: null,
     final12: null,
     final34: null,
     winners: [],
@@ -72,7 +76,7 @@ const normalizePlayoffDivision = (value) => (['all', 'male', 'female'].includes(
 
 const normalizeCompetitionState = (value) => ({
   playoffMode: [32, 16, 8, 4].includes(Number(value?.playoffMode)) ? Number(value.playoffMode) : 16,
-  playoffStage: ['none', 'roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final'].includes(value?.playoffStage)
+  playoffStage: ['none', 'roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final', 'fifthPlace'].includes(value?.playoffStage)
     ? value.playoffStage
     : 'none',
   playoffFinalRounds: normalizePlayoffFinalRounds(value?.playoffFinalRounds),
@@ -84,11 +88,13 @@ const hasBracketData = (bracket) =>
     bracket &&
       (bracket.final12 ||
         bracket.final34 ||
+        bracket.fifthPlaceFinal ||
         bracket.winners?.length ||
         bracket.roundOf32?.length ||
         bracket.roundOf16?.length ||
         bracket.quarterFinals?.length ||
-        bracket.semiFinals?.length),
+        bracket.semiFinals?.length ||
+        bracket.fifthPlaceSemiFinals?.length),
   )
 
 const normalizeCompetitionDivisions = (value, legacy = {}) => {
@@ -219,25 +225,76 @@ const normalizePasswordProtectionEnabled = (value) => (typeof value === 'boolean
 const isValidScoreValue = (value) => Number.isInteger(value) && value >= 0 && value <= MAX_PLAYER_SCORE
 const isScoreInputDigitsOnly = (value) => /^\d{1,3}$/.test(String(value || '').trim())
 
-const findActivePlayoffMatch = (bracket, playoffStage, playerId) => {
-  if (playoffStage === 'final') {
+const findActivePlayoffMatch = (bracket, playoffStage, playerId, explicitStageKey = null) => {
+  const stageKey = explicitStageKey || playoffStage
+
+  if (stageKey === 'final') {
     const finals = [bracket.final12, bracket.final34].filter(Boolean)
     return finals.find((match) => match?.p1?.id === playerId || match?.p2?.id === playerId) || null
   }
 
-  if (!PLAYOFF_SUBMISSION_STAGES.includes(playoffStage)) {
+  if (stageKey === 'fifthPlaceFinal') {
+    return bracket.fifthPlaceFinal?.p1?.id === playerId || bracket.fifthPlaceFinal?.p2?.id === playerId
+      ? bracket.fifthPlaceFinal
+      : null
+  }
+
+  if (stageKey === 'fifthPlaceSemiFinals') {
+    const fifthPlaceMatches = bracket.fifthPlaceSemiFinals || []
+    return fifthPlaceMatches.find((match) => match?.p1?.id === playerId || match?.p2?.id === playerId) || null
+  }
+
+  if (stageKey === 'fifthPlace') {
+    const fifthPlaceMatches = bracket.fifthPlaceFinal ? [bracket.fifthPlaceFinal] : (bracket.fifthPlaceSemiFinals || [])
+    return fifthPlaceMatches.find((match) => match?.p1?.id === playerId || match?.p2?.id === playerId) || null
+  }
+
+  if (!PLAYOFF_SUBMISSION_STAGES.includes(stageKey)) {
     return null
   }
 
-  const stageMatches = Array.isArray(bracket?.[playoffStage]) ? bracket[playoffStage] : []
+  const stageMatches = Array.isArray(bracket?.[stageKey]) ? bracket[stageKey] : []
   return stageMatches.find((match) => match?.p1?.id === playerId || match?.p2?.id === playerId) || null
+}
+
+const resolveCompetitionDivisionIdForPlayer = (state, playerId, preferredDivisionId = null, explicitStageKey = null) => {
+  const divisionIds = [
+    preferredDivisionId,
+    state?.playoffDivision,
+    'all',
+    'male',
+    'female',
+  ].filter((value, index, list) => ['all', 'male', 'female'].includes(value) && list.indexOf(value) === index)
+
+  for (const divisionId of divisionIds) {
+    const divisionState = normalizeCompetitionState(state?.competitionDivisions?.[divisionId])
+    if (findActivePlayoffMatch(divisionState.bracket, divisionState.playoffStage, playerId, explicitStageKey)) {
+      return divisionId
+    }
+  }
+
+  return preferredDivisionId && ['all', 'male', 'female'].includes(preferredDivisionId) ? preferredDivisionId : 'all'
 }
 
 const resolvePlayoffWinner = (match) => {
   if (!match) return null
+  const isStandardMatch = !match.isFinal || match.id === 'fifthPlaceFinal'
+  const hasSubmissionTracking =
+    Object.prototype.hasOwnProperty.call(match, 'submittedP1') ||
+    Object.prototype.hasOwnProperty.call(match, 'submittedP2') ||
+    Object.prototype.hasOwnProperty.call(match, 'submittedShootOffP1') ||
+    Object.prototype.hasOwnProperty.call(match, 'submittedShootOffP2')
+
+  if (isStandardMatch && hasSubmissionTracking && (!match.submittedP1 || !match.submittedP2)) {
+    return null
+  }
+
   if (Number(match.s1) > Number(match.s2)) return match.p1
   if (Number(match.s2) > Number(match.s1)) return match.p2
-  if (!match.isFinal) {
+  if (isStandardMatch) {
+    if (hasSubmissionTracking && (!match.submittedShootOffP1 || !match.submittedShootOffP2)) {
+      return null
+    }
     if (Number(match.shootOffS1) > Number(match.shootOffS2)) return match.p1
     if (Number(match.shootOffS2) > Number(match.shootOffS1)) return match.p2
     return null
@@ -334,11 +391,13 @@ const rebuildBracketAfterStageEdit = (divisionState, changedStageKey) => {
     if (final12?.winner && final34?.winner) {
       const silver = final12.winner.id === final12.p1.id ? final12.p2 : final12.p1
       const fourth = final34.winner.id === final34.p1.id ? final34.p2 : final34.p1
+      const existingFifthEntry = (nextBracket.winners || []).find((entry) => entry.position === 5) || null
       nextBracket.winners = [
         { position: 1, player: final12.winner, autoRecalculated: markAsAutoRecalculated },
         { position: 2, player: silver, autoRecalculated: markAsAutoRecalculated },
         { position: 3, player: final34.winner, autoRecalculated: markAsAutoRecalculated },
         { position: 4, player: fourth, autoRecalculated: markAsAutoRecalculated },
+        ...(existingFifthEntry ? [{ ...existingFifthEntry, autoRecalculated: markAsAutoRecalculated || existingFifthEntry.autoRecalculated }] : []),
       ]
     } else {
       nextBracket.winners = []
@@ -347,6 +406,20 @@ const rebuildBracketAfterStageEdit = (divisionState, changedStageKey) => {
 
   if (changedStageKey === 'final') {
     recalculateWinners(false)
+    return nextBracket
+  }
+
+  if (changedStageKey === 'fifthPlace') {
+    const fifthPlaceSemiFinals = Array.isArray(nextBracket.fifthPlaceSemiFinals) ? nextBracket.fifthPlaceSemiFinals : []
+    const fifthPlaceWinners = fifthPlaceSemiFinals.map((match) => resolveWinningPlayer(match))
+    if (fifthPlaceWinners.length === 2 && fifthPlaceWinners.every(Boolean)) {
+      const fifthPlaceFinal = mergeMatchState(nextBracket.fifthPlaceFinal, createMatch('fifthPlaceFinal', fifthPlaceWinners[0], fifthPlaceWinners[1]), true)
+      fifthPlaceFinal.winner = resolveWinningPlayer(fifthPlaceFinal)
+      nextBracket.fifthPlaceFinal = fifthPlaceFinal
+    } else {
+      nextBracket.fifthPlaceFinal = null
+    }
+    recalculateWinners(true)
     return nextBracket
   }
 
@@ -480,9 +553,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Incorrect 4-digit password.' })
     }
 
-    const divisionId = player.gender === 'female' ? 'female' : 'male'
+    const preferredDivisionId = ['all', 'male', 'female'].includes(req.body?.divisionId) ? req.body.divisionId : null
+    const explicitStageKey = ['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final', 'fifthPlace', 'fifthPlaceSemiFinals', 'fifthPlaceFinal'].includes(req.body?.stageKey)
+      ? req.body.stageKey
+      : null
+    const divisionId = resolveCompetitionDivisionIdForPlayer(currentState, playerId, preferredDivisionId, explicitStageKey)
     const divisionState = normalizeCompetitionState(currentState.competitionDivisions?.[divisionId])
-    const activeMatch = findActivePlayoffMatch(divisionState.bracket, divisionState.playoffStage, playerId)
+    const activeMatch = findActivePlayoffMatch(divisionState.bracket, divisionState.playoffStage, playerId, explicitStageKey)
 
     if (!activeMatch) {
       return res.status(400).json({ error: 'No active playoff match found for this player.' })
@@ -572,6 +649,16 @@ export default async function handler(req, res) {
         updatedDivisionState.bracket.final34 = updatedMatch
       }
       updatedDivisionState.bracket = rebuildBracketAfterStageEdit(updatedDivisionState, 'final')
+    } else if (divisionState.playoffStage === 'fifthPlace') {
+    if (updatedDivisionState.bracket.fifthPlaceFinal?.id === updatedMatch.id) {
+      updatedMatch.isFinal = false
+      updatedDivisionState.bracket.fifthPlaceFinal = updatedMatch
+    } else {
+        updatedDivisionState.bracket.fifthPlaceSemiFinals = (updatedDivisionState.bracket.fifthPlaceSemiFinals || []).map((match) =>
+          match.id === updatedMatch.id ? updatedMatch : match,
+        )
+      }
+      updatedDivisionState.bracket = rebuildBracketAfterStageEdit(updatedDivisionState, 'fifthPlace')
     } else {
       updatedDivisionState.bracket[divisionState.playoffStage] = (updatedDivisionState.bracket[divisionState.playoffStage] || []).map((match) =>
         match.id === updatedMatch.id ? updatedMatch : match,

@@ -257,13 +257,180 @@
       "gender": "male",
       "entryNumber": 28,
       "laneLetter": "D"
+    },
+    {
+      "id": "1781884603920-m6uupg",
+      "name": "ваивапрв",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 29,
+      "laneLetter": "A"
+    },
+    {
+      "id": "1781884604880-a9avit",
+      "name": "варврвар",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 30,
+      "laneLetter": "B"
+    },
+    {
+      "id": "1781884605915-01sfze",
+      "name": "раврвр",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 31,
+      "laneLetter": "C"
+    },
+    {
+      "id": "1781884607305-pazriv",
+      "name": "рварв",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 32,
+      "laneLetter": "D"
+    },
+    {
+      "id": "1781884611968-0i2rpy",
+      "name": "аврар",
+      "phone": "",
+      "password": "",
+      "gender": "female",
+      "entryNumber": 33,
+      "laneLetter": "A"
+    },
+    {
+      "id": "1781885285379-tqgh71",
+      "name": "ееккк",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 34,
+      "laneLetter": "B"
+    },
+    {
+      "id": "1781885286268-gw6bbh",
+      "name": "укрпкрк",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 35,
+      "laneLetter": "C"
+    },
+    {
+      "id": "1781885286916-404clw",
+      "name": "кркеркр",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 36,
+      "laneLetter": "D"
+    },
+    {
+      "id": "1781885287821-6dp9th",
+      "name": "укук",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 37,
+      "laneLetter": "A"
+    },
+    {
+      "id": "1781885288500-s7d7l3",
+      "name": "кре",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 38,
+      "laneLetter": "B"
+    },
+    {
+      "id": "1781885288892-6vkzny",
+      "name": "ер",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 39,
+      "laneLetter": "C"
+    },
+    {
+      "id": "1781885289757-9s5d3e",
+      "name": "еркер",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 40,
+      "laneLetter": "D"
+    },
+    {
+      "id": "1781885290720-o94t95",
+      "name": "еркре",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 41,
+      "laneLetter": "A"
+    },
+    {
+      "id": "1781885291960-7s0o32",
+      "name": "еркерек",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 42,
+      "laneLetter": "B"
+    },
+    {
+      "id": "1781885292696-hqef5a",
+      "name": "екркер",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 43,
+      "laneLetter": "C"
+    },
+    {
+      "id": "1781885293386-ojhxey",
+      "name": "рекрекр",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 44,
+      "laneLetter": "D"
+    },
+    {
+      "id": "1781885294214-2gg22j",
+      "name": "ререкрук",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 45,
+      "laneLetter": "A"
+    },
+    {
+      "id": "1781885294474-lhl003",
+      "name": "ерке",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 46,
+      "laneLetter": "B"
+    },
+    {
+      "id": "1781885294654-j09qmn",
+      "name": "пекр",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 47,
+      "laneLetter": "C"
     }
   ],
-  "scores": {
-    "1780424777918-5os7rf": {
-      "1": 11
-    }
-  },
+  "scores": {},
   "competitionDivisions": {
     "all": {
       "playoffMode": 16,
@@ -277,6 +444,8 @@
         "roundOf16": [],
         "quarterFinals": [],
         "semiFinals": [],
+        "fifthPlaceSemiFinals": [],
+        "fifthPlaceFinal": null,
         "final12": null,
         "final34": null,
         "winners": []
@@ -284,10 +453,10 @@
     },
     "male": {
       "playoffMode": 16,
-      "playoffStage": "semiFinals",
+      "playoffStage": "fifthPlace",
       "playoffFinalRounds": {
-        "final12": 1,
-        "final34": 1
+        "final12": 3,
+        "final34": 3
       },
       "bracket": {
         "roundOf32": [],
@@ -295,37 +464,37 @@
           {
             "id": "roundOf16-0",
             "p1": {
-              "id": "1780424777918-5os7rf",
-              "name": "Эрали Набиевв",
-              "phone": "0505549904",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 28,
-              "laneLetter": "D"
-            },
-            "p2": {
-              "id": "1780424602664-gs6w1j",
-              "name": "арпрек",
+              "id": "1780424584161-1g0ydu",
+              "name": "пуцпц",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 15,
-              "laneLetter": "C"
+              "entryNumber": 1,
+              "laneLetter": "A"
             },
-            "s1": 1,
-            "s2": 10,
+            "p2": {
+              "id": "1780424603820-t8031c",
+              "name": "керкерер",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 16,
+              "laneLetter": "D"
+            },
+            "s1": 0,
+            "s2": 3,
             "shootOffS1": 0,
             "shootOffS2": 0,
             "s1_bot": 0,
             "s2_bot": 0,
             "winner": {
-              "id": "1780424602664-gs6w1j",
-              "name": "арпрек",
+              "id": "1780424603820-t8031c",
+              "name": "керкерер",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 15,
-              "laneLetter": "C"
+              "entryNumber": 16,
+              "laneLetter": "D"
             },
             "isFinal": false,
             "roundsP1": [
@@ -374,21 +543,12 @@
             ],
             "submittedShootOffP1": false,
             "submittedShootOffP2": false,
-            "submittedP1": true,
-            "submittedP2": true
+            "submittedP2": true,
+            "submittedP1": true
           },
           {
             "id": "roundOf16-2",
             "p1": {
-              "id": "1780424591639-96ueqn",
-              "name": "нн",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 7,
-              "laneLetter": "C"
-            },
-            "p2": {
               "id": "1780424593204-37n7kc",
               "name": "пцпуцп",
               "phone": "",
@@ -397,20 +557,29 @@
               "entryNumber": 8,
               "laneLetter": "D"
             },
-            "s1": 10,
-            "s2": 0,
+            "p2": {
+              "id": "1780424593683-5bg9qn",
+              "name": "н",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 9,
+              "laneLetter": "A"
+            },
+            "s1": 0,
+            "s2": 3,
             "shootOffS1": 0,
             "shootOffS2": 0,
             "s1_bot": 0,
             "s2_bot": 0,
             "winner": {
-              "id": "1780424591639-96ueqn",
-              "name": "нн",
+              "id": "1780424593683-5bg9qn",
+              "name": "н",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 7,
-              "laneLetter": "C"
+              "entryNumber": 9,
+              "laneLetter": "A"
             },
             "isFinal": false,
             "roundsP1": [
@@ -459,102 +628,19 @@
             ],
             "submittedShootOffP1": false,
             "submittedShootOffP2": false,
+            "submittedP2": true,
             "submittedP1": true
           },
           {
             "id": "roundOf16-4",
             "p1": {
-              "id": "1780424588667-8yt9y3",
-              "name": "уцауцп",
+              "id": "1780424589476-58lcih",
+              "name": "укпркерк",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 4,
-              "laneLetter": "D"
-            },
-            "p2": {
-              "id": "1780424596349-v1es4m",
-              "name": "рнн",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 11,
-              "laneLetter": "C"
-            },
-            "s1": 10,
-            "s2": 0,
-            "shootOffS1": 0,
-            "shootOffS2": 0,
-            "s1_bot": 0,
-            "s2_bot": 0,
-            "winner": {
-              "id": "1780424588667-8yt9y3",
-              "name": "уцауцп",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 4,
-              "laneLetter": "D"
-            },
-            "isFinal": false,
-            "roundsP1": [
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0
-            ],
-            "roundsP2": [
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0
-            ],
-            "submittedRoundsP1": [
-              false,
-              false,
-              false,
-              false,
-              false,
-              false
-            ],
-            "submittedRoundsP2": [
-              false,
-              false,
-              false,
-              false,
-              false,
-              false
-            ],
-            "submittedShootOffP1": false,
-            "submittedShootOffP2": false,
-            "submittedP1": true
-          },
-          {
-            "id": "roundOf16-6",
-            "p1": {
-              "id": "1780424587461-6mi0p1",
-              "name": "екреку",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 3,
-              "laneLetter": "C"
+              "entryNumber": 5,
+              "laneLetter": "A"
             },
             "p2": {
               "id": "1780424598575-qr3o35",
@@ -566,7 +652,7 @@
               "laneLetter": "D"
             },
             "s1": 0,
-            "s2": 10,
+            "s2": 3,
             "shootOffS1": 0,
             "shootOffS2": 0,
             "s1_bot": 0,
@@ -627,18 +713,19 @@
             ],
             "submittedShootOffP1": false,
             "submittedShootOffP2": false,
-            "submittedP2": true
+            "submittedP2": true,
+            "submittedP1": true
           },
           {
-            "id": "roundOf16-8",
+            "id": "roundOf16-6",
             "p1": {
-              "id": "1780424585873-gx3wvn",
-              "name": "цуцппук",
+              "id": "1780424588667-8yt9y3",
+              "name": "уцауцп",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 2,
-              "laneLetter": "B"
+              "entryNumber": 4,
+              "laneLetter": "D"
             },
             "p2": {
               "id": "1780424599580-tdnpjr",
@@ -649,19 +736,104 @@
               "entryNumber": 13,
               "laneLetter": "A"
             },
-            "s1": 1,
-            "s2": 0,
+            "s1": 0,
+            "s2": 3,
             "shootOffS1": 0,
             "shootOffS2": 0,
             "s1_bot": 0,
             "s2_bot": 0,
             "winner": {
-              "id": "1780424585873-gx3wvn",
-              "name": "цуцппук",
+              "id": "1780424599580-tdnpjr",
+              "name": "рнрр",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 2,
+              "entryNumber": 13,
+              "laneLetter": "A"
+            },
+            "isFinal": false,
+            "roundsP1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "roundsP2": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "submittedRoundsP1": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedRoundsP2": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedShootOffP1": false,
+            "submittedShootOffP2": false,
+            "submittedP2": true,
+            "submittedP1": true
+          },
+          {
+            "id": "roundOf16-8",
+            "p1": {
+              "id": "1780424587461-6mi0p1",
+              "name": "екреку",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 3,
+              "laneLetter": "C"
+            },
+            "p2": {
+              "id": "1780424600897-reqtor",
+              "name": "вмыаиваи",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 14,
+              "laneLetter": "B"
+            },
+            "s1": 0,
+            "s2": 3,
+            "shootOffS1": 0,
+            "shootOffS2": 0,
+            "s1_bot": 0,
+            "s2_bot": 0,
+            "winner": {
+              "id": "1780424600897-reqtor",
+              "name": "вмыаиваи",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 14,
               "laneLetter": "B"
             },
             "isFinal": false,
@@ -711,18 +883,104 @@
             ],
             "submittedShootOffP1": false,
             "submittedShootOffP2": false,
+            "submittedP2": true,
             "submittedP1": true
           },
           {
             "id": "roundOf16-10",
             "p1": {
-              "id": "1780424589476-58lcih",
-              "name": "укпркерк",
+              "id": "1780424590568-s8421m",
+              "name": "уццупц",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 5,
-              "laneLetter": "A"
+              "entryNumber": 6,
+              "laneLetter": "B"
+            },
+            "p2": {
+              "id": "1780424596349-v1es4m",
+              "name": "рнн",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 11,
+              "laneLetter": "C"
+            },
+            "s1": 0,
+            "s2": 3,
+            "shootOffS1": 0,
+            "shootOffS2": 0,
+            "s1_bot": 0,
+            "s2_bot": 0,
+            "winner": {
+              "id": "1780424596349-v1es4m",
+              "name": "рнн",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 11,
+              "laneLetter": "C"
+            },
+            "isFinal": false,
+            "roundsP1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "roundsP2": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "submittedRoundsP1": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedRoundsP2": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedShootOffP1": false,
+            "submittedShootOffP2": false,
+            "submittedP2": true,
+            "submittedP1": true
+          },
+          {
+            "id": "roundOf16-12",
+            "p1": {
+              "id": "1780424591639-96ueqn",
+              "name": "нн",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 7,
+              "laneLetter": "C"
             },
             "p2": {
               "id": "1780424595157-3qtowr",
@@ -733,8 +991,8 @@
               "entryNumber": 10,
               "laneLetter": "B"
             },
-            "s1": 10,
-            "s2": 22,
+            "s1": 0,
+            "s2": 3,
             "shootOffS1": 0,
             "shootOffS2": 0,
             "s1_bot": 0,
@@ -746,6 +1004,348 @@
               "password": "",
               "gender": "male",
               "entryNumber": 10,
+              "laneLetter": "B"
+            },
+            "isFinal": false,
+            "roundsP1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "roundsP2": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "submittedRoundsP1": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedRoundsP2": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedShootOffP1": false,
+            "submittedShootOffP2": false,
+            "submittedP2": true,
+            "submittedP1": true
+          },
+          {
+            "id": "roundOf16-14",
+            "p1": {
+              "id": "1780424585873-gx3wvn",
+              "name": "цуцппук",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 2,
+              "laneLetter": "B"
+            },
+            "p2": {
+              "id": "1780424602664-gs6w1j",
+              "name": "арпрек",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 15,
+              "laneLetter": "C"
+            },
+            "s1": 0,
+            "s2": 3,
+            "shootOffS1": 0,
+            "shootOffS2": 0,
+            "s1_bot": 0,
+            "s2_bot": 0,
+            "winner": {
+              "id": "1780424602664-gs6w1j",
+              "name": "арпрек",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 15,
+              "laneLetter": "C"
+            },
+            "isFinal": false,
+            "roundsP1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "roundsP2": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "submittedRoundsP1": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedRoundsP2": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedShootOffP1": false,
+            "submittedShootOffP2": false,
+            "submittedP2": true,
+            "submittedP1": true
+          }
+        ],
+        "quarterFinals": [
+          {
+            "id": "quarterFinals-0",
+            "p1": {
+              "id": "1780424603820-t8031c",
+              "name": "керкерер",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 16,
+              "laneLetter": "D"
+            },
+            "p2": {
+              "id": "1780424593683-5bg9qn",
+              "name": "н",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 9,
+              "laneLetter": "A"
+            },
+            "s1": 2,
+            "s2": 0,
+            "shootOffS1": 0,
+            "shootOffS2": 0,
+            "s1_bot": 0,
+            "s2_bot": 0,
+            "winner": {
+              "id": "1780424603820-t8031c",
+              "name": "керкерер",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 16,
+              "laneLetter": "D"
+            },
+            "isFinal": false,
+            "roundsP1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "roundsP2": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "submittedRoundsP1": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedRoundsP2": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedShootOffP1": false,
+            "submittedShootOffP2": false,
+            "submittedP1": true,
+            "submittedP2": true
+          },
+          {
+            "id": "quarterFinals-2",
+            "p1": {
+              "id": "1780424598575-qr3o35",
+              "name": "ццауап",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 12,
+              "laneLetter": "D"
+            },
+            "p2": {
+              "id": "1780424599580-tdnpjr",
+              "name": "рнрр",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 13,
+              "laneLetter": "A"
+            },
+            "s1": 2,
+            "s2": 0,
+            "shootOffS1": 0,
+            "shootOffS2": 0,
+            "s1_bot": 0,
+            "s2_bot": 0,
+            "winner": {
+              "id": "1780424598575-qr3o35",
+              "name": "ццауап",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 12,
+              "laneLetter": "D"
+            },
+            "isFinal": false,
+            "roundsP1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "roundsP2": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "submittedRoundsP1": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedRoundsP2": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedShootOffP1": false,
+            "submittedShootOffP2": false,
+            "submittedP1": true,
+            "submittedP2": true
+          },
+          {
+            "id": "quarterFinals-4",
+            "p1": {
+              "id": "1780424600897-reqtor",
+              "name": "вмыаиваи",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 14,
+              "laneLetter": "B"
+            },
+            "p2": {
+              "id": "1780424596349-v1es4m",
+              "name": "рнн",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 11,
+              "laneLetter": "C"
+            },
+            "s1": 2,
+            "s2": 0,
+            "shootOffS1": 0,
+            "shootOffS2": 0,
+            "s1_bot": 0,
+            "s2_bot": 0,
+            "winner": {
+              "id": "1780424600897-reqtor",
+              "name": "вмыаиваи",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 14,
               "laneLetter": "B"
             },
             "isFinal": false,
@@ -799,39 +1399,39 @@
             "submittedP2": true
           },
           {
-            "id": "roundOf16-12",
+            "id": "quarterFinals-6",
             "p1": {
-              "id": "1780424590568-s8421m",
-              "name": "уццупц",
+              "id": "1780424595157-3qtowr",
+              "name": "нецац",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 6,
+              "entryNumber": 10,
               "laneLetter": "B"
             },
             "p2": {
-              "id": "1780424593683-5bg9qn",
-              "name": "н",
+              "id": "1780424602664-gs6w1j",
+              "name": "арпрек",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 9,
-              "laneLetter": "A"
+              "entryNumber": 15,
+              "laneLetter": "C"
             },
-            "s1": 10,
-            "s2": 0,
+            "s1": 0,
+            "s2": 2,
             "shootOffS1": 0,
             "shootOffS2": 0,
             "s1_bot": 0,
             "s2_bot": 0,
             "winner": {
-              "id": "1780424590568-s8421m",
-              "name": "уццупц",
+              "id": "1780424602664-gs6w1j",
+              "name": "арпрек",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 6,
-              "laneLetter": "B"
+              "entryNumber": 15,
+              "laneLetter": "C"
             },
             "isFinal": false,
             "roundsP1": [
@@ -880,187 +1480,20 @@
             ],
             "submittedShootOffP1": false,
             "submittedShootOffP2": false,
-            "submittedP1": true
-          },
-          {
-            "id": "roundOf16-14",
-            "p1": {
-              "id": "1780424584161-1g0ydu",
-              "name": "пуцпц",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 1,
-              "laneLetter": "A"
-            },
-            "p2": {
-              "id": "1780424600897-reqtor",
-              "name": "вмыаиваи",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 14,
-              "laneLetter": "B"
-            },
-            "s1": 10,
-            "s2": 0,
-            "shootOffS1": 0,
-            "shootOffS2": 0,
-            "s1_bot": 0,
-            "s2_bot": 0,
-            "winner": {
-              "id": "1780424584161-1g0ydu",
-              "name": "пуцпц",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 1,
-              "laneLetter": "A"
-            },
-            "isFinal": false,
-            "roundsP1": [
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0
-            ],
-            "roundsP2": [
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0
-            ],
-            "submittedRoundsP1": [
-              false,
-              false,
-              false,
-              false,
-              false,
-              false
-            ],
-            "submittedRoundsP2": [
-              false,
-              false,
-              false,
-              false,
-              false,
-              false
-            ],
-            "submittedShootOffP1": false,
-            "submittedShootOffP2": false,
+            "submittedP2": true,
             "submittedP1": true
           }
         ],
-        "quarterFinals": [
+        "semiFinals": [
           {
-            "id": "quarterFinals-0",
+            "id": "semiFinals-0",
             "p1": {
-              "id": "1780424602664-gs6w1j",
-              "name": "арпрек",
+              "id": "1780424603820-t8031c",
+              "name": "керкерер",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 15,
-              "laneLetter": "C"
-            },
-            "p2": {
-              "id": "1780424591639-96ueqn",
-              "name": "нн",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 7,
-              "laneLetter": "C"
-            },
-            "s1": 1,
-            "s2": 0,
-            "shootOffS1": 0,
-            "shootOffS2": 0,
-            "s1_bot": 0,
-            "s2_bot": 0,
-            "winner": {
-              "id": "1780424602664-gs6w1j",
-              "name": "арпрек",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 15,
-              "laneLetter": "C"
-            },
-            "isFinal": false,
-            "roundsP1": [
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0
-            ],
-            "roundsP2": [
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0
-            ],
-            "submittedRoundsP1": [
-              false,
-              false,
-              false,
-              false,
-              false,
-              false
-            ],
-            "submittedRoundsP2": [
-              false,
-              false,
-              false,
-              false,
-              false,
-              false
-            ],
-            "submittedShootOffP1": false,
-            "submittedShootOffP2": false,
-            "submittedP1": true
-          },
-          {
-            "id": "quarterFinals-2",
-            "p1": {
-              "id": "1780424588667-8yt9y3",
-              "name": "уцауцп",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 4,
+              "entryNumber": 16,
               "laneLetter": "D"
             },
             "p2": {
@@ -1072,19 +1505,19 @@
               "entryNumber": 12,
               "laneLetter": "D"
             },
-            "s1": 1,
+            "s1": 2,
             "s2": 0,
             "shootOffS1": 0,
             "shootOffS2": 0,
             "s1_bot": 0,
             "s2_bot": 0,
             "winner": {
-              "id": "1780424588667-8yt9y3",
-              "name": "уцауцп",
+              "id": "1780424603820-t8031c",
+              "name": "керкерер",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 4,
+              "entryNumber": 16,
               "laneLetter": "D"
             },
             "isFinal": false,
@@ -1134,42 +1567,43 @@
             ],
             "submittedShootOffP1": false,
             "submittedShootOffP2": false,
-            "submittedP1": true
+            "submittedP1": true,
+            "submittedP2": true
           },
           {
-            "id": "quarterFinals-4",
+            "id": "semiFinals-2",
             "p1": {
-              "id": "1780424585873-gx3wvn",
-              "name": "цуцппук",
+              "id": "1780424600897-reqtor",
+              "name": "вмыаиваи",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 2,
+              "entryNumber": 14,
               "laneLetter": "B"
             },
             "p2": {
-              "id": "1780424589476-58lcih",
-              "name": "укпркерк",
+              "id": "1780424602664-gs6w1j",
+              "name": "арпрек",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 5,
-              "laneLetter": "A"
+              "entryNumber": 15,
+              "laneLetter": "C"
             },
-            "s1": 1,
-            "s2": 0,
+            "s1": 0,
+            "s2": 2,
             "shootOffS1": 0,
             "shootOffS2": 0,
             "s1_bot": 0,
             "s2_bot": 0,
             "winner": {
-              "id": "1780424585873-gx3wvn",
-              "name": "цуцппук",
+              "id": "1780424602664-gs6w1j",
+              "name": "арпрек",
               "phone": "",
               "password": "",
               "gender": "male",
-              "entryNumber": 2,
-              "laneLetter": "B"
+              "entryNumber": 15,
+              "laneLetter": "C"
             },
             "isFinal": false,
             "roundsP1": [
@@ -1218,97 +1652,473 @@
             ],
             "submittedShootOffP1": false,
             "submittedShootOffP2": false,
-            "submittedP1": true
-          },
-          {
-            "id": "quarterFinals-6",
-            "p1": {
-              "id": "1780424590568-s8421m",
-              "name": "уццупц",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 6,
-              "laneLetter": "B"
-            },
-            "p2": {
-              "id": "1780424584161-1g0ydu",
-              "name": "пуцпц",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 1,
-              "laneLetter": "A"
-            },
-            "s1": 1,
-            "s2": 0,
-            "shootOffS1": 0,
-            "shootOffS2": 0,
-            "s1_bot": 0,
-            "s2_bot": 0,
-            "winner": {
-              "id": "1780424590568-s8421m",
-              "name": "уццупц",
-              "phone": "",
-              "password": "",
-              "gender": "male",
-              "entryNumber": 6,
-              "laneLetter": "B"
-            },
-            "isFinal": false,
-            "roundsP1": [
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0
-            ],
-            "roundsP2": [
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0
-            ],
-            "submittedRoundsP1": [
-              false,
-              false,
-              false,
-              false,
-              false,
-              false
-            ],
-            "submittedRoundsP2": [
-              false,
-              false,
-              false,
-              false,
-              false,
-              false
-            ],
-            "submittedShootOffP1": false,
-            "submittedShootOffP2": false,
+            "submittedP2": true,
             "submittedP1": true
           }
         ],
-        "semiFinals": [],
-        "final12": null,
-        "final34": null,
-        "winners": []
+        "fifthPlaceSemiFinals": [
+          {
+            "id": "fifthPlaceSemiFinals-0",
+            "p1": {
+              "id": "1780424593683-5bg9qn",
+              "name": "н",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 9,
+              "laneLetter": "A"
+            },
+            "p2": {
+              "id": "1780424599580-tdnpjr",
+              "name": "рнрр",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 13,
+              "laneLetter": "A"
+            },
+            "s1": 2,
+            "s2": 1,
+            "shootOffS1": 0,
+            "shootOffS2": 0,
+            "s1_bot": 0,
+            "s2_bot": 0,
+            "winner": {
+              "id": "1780424593683-5bg9qn",
+              "name": "н",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 9,
+              "laneLetter": "A"
+            },
+            "isFinal": false,
+            "roundsP1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "roundsP2": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "submittedRoundsP1": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedRoundsP2": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedShootOffP1": false,
+            "submittedShootOffP2": false,
+            "submittedP1": true,
+            "submittedP2": true
+          },
+          {
+            "id": "fifthPlaceSemiFinals-1",
+            "p1": {
+              "id": "1780424596349-v1es4m",
+              "name": "рнн",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 11,
+              "laneLetter": "C"
+            },
+            "p2": {
+              "id": "1780424595157-3qtowr",
+              "name": "нецац",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 10,
+              "laneLetter": "B"
+            },
+            "s1": 2,
+            "s2": 1,
+            "shootOffS1": 0,
+            "shootOffS2": 0,
+            "s1_bot": 0,
+            "s2_bot": 0,
+            "winner": {
+              "id": "1780424596349-v1es4m",
+              "name": "рнн",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 11,
+              "laneLetter": "C"
+            },
+            "isFinal": false,
+            "roundsP1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "roundsP2": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "submittedRoundsP1": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedRoundsP2": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "submittedShootOffP1": false,
+            "submittedShootOffP2": false,
+            "submittedP1": true,
+            "submittedP2": true
+          }
+        ],
+        "fifthPlaceFinal": {
+          "id": "fifthPlaceFinal",
+          "p1": {
+            "id": "1780424593683-5bg9qn",
+            "name": "н",
+            "phone": "",
+            "password": "",
+            "gender": "male",
+            "entryNumber": 9,
+            "laneLetter": "A"
+          },
+          "p2": {
+            "id": "1780424596349-v1es4m",
+            "name": "рнн",
+            "phone": "",
+            "password": "",
+            "gender": "male",
+            "entryNumber": 11,
+            "laneLetter": "C"
+          },
+          "s1": 0,
+          "s2": 0,
+          "shootOffS1": 0,
+          "shootOffS2": 0,
+          "s1_bot": 0,
+          "s2_bot": 0,
+          "winner": null,
+          "isFinal": false,
+          "roundsP1": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "roundsP2": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "submittedRoundsP1": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "submittedRoundsP2": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "submittedShootOffP1": false,
+          "submittedShootOffP2": false
+        },
+        "final12": {
+          "id": "final12",
+          "p1": {
+            "id": "1780424603820-t8031c",
+            "name": "керкерер",
+            "phone": "",
+            "password": "",
+            "gender": "male",
+            "entryNumber": 16,
+            "laneLetter": "D"
+          },
+          "p2": {
+            "id": "1780424602664-gs6w1j",
+            "name": "арпрек",
+            "phone": "",
+            "password": "",
+            "gender": "male",
+            "entryNumber": 15,
+            "laneLetter": "C"
+          },
+          "s1": 42,
+          "s2": 0,
+          "shootOffS1": 0,
+          "shootOffS2": 0,
+          "s1_bot": 6,
+          "s2_bot": 0,
+          "winner": {
+            "id": "1780424603820-t8031c",
+            "name": "керкерер",
+            "phone": "",
+            "password": "",
+            "gender": "male",
+            "entryNumber": 16,
+            "laneLetter": "D"
+          },
+          "isFinal": true,
+          "roundsP1": [
+            2,
+            20,
+            20,
+            0,
+            0,
+            0,
+            2,
+            2,
+            2,
+            0,
+            0,
+            0
+          ],
+          "roundsP2": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "submittedRoundsP1": [
+            true,
+            true,
+            true,
+            false,
+            false,
+            false
+          ],
+          "submittedRoundsP2": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "submittedShootOffP1": false,
+          "submittedShootOffP2": false
+        },
+        "final34": {
+          "id": "final34",
+          "p1": {
+            "id": "1780424598575-qr3o35",
+            "name": "ццауап",
+            "phone": "",
+            "password": "",
+            "gender": "male",
+            "entryNumber": 12,
+            "laneLetter": "D"
+          },
+          "p2": {
+            "id": "1780424600897-reqtor",
+            "name": "вмыаиваи",
+            "phone": "",
+            "password": "",
+            "gender": "male",
+            "entryNumber": 14,
+            "laneLetter": "B"
+          },
+          "s1": 60,
+          "s2": 0,
+          "shootOffS1": 0,
+          "shootOffS2": 0,
+          "s1_bot": 6,
+          "s2_bot": 0,
+          "winner": {
+            "id": "1780424598575-qr3o35",
+            "name": "ццауап",
+            "phone": "",
+            "password": "",
+            "gender": "male",
+            "entryNumber": 12,
+            "laneLetter": "D"
+          },
+          "isFinal": true,
+          "roundsP1": [
+            20,
+            20,
+            20,
+            0,
+            0,
+            0,
+            2,
+            2,
+            2,
+            0,
+            0,
+            0
+          ],
+          "roundsP2": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "submittedRoundsP1": [
+            true,
+            true,
+            true,
+            false,
+            false,
+            false
+          ],
+          "submittedRoundsP2": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "submittedShootOffP1": false,
+          "submittedShootOffP2": false
+        },
+        "winners": [
+          {
+            "position": 1,
+            "player": {
+              "id": "1780424603820-t8031c",
+              "name": "керкерер",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 16,
+              "laneLetter": "D"
+            }
+          },
+          {
+            "position": 2,
+            "player": {
+              "id": "1780424602664-gs6w1j",
+              "name": "арпрек",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 15,
+              "laneLetter": "C"
+            }
+          },
+          {
+            "position": 3,
+            "player": {
+              "id": "1780424598575-qr3o35",
+              "name": "ццауап",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 12,
+              "laneLetter": "D"
+            }
+          },
+          {
+            "position": 4,
+            "player": {
+              "id": "1780424600897-reqtor",
+              "name": "вмыаиваи",
+              "phone": "",
+              "password": "",
+              "gender": "male",
+              "entryNumber": 14,
+              "laneLetter": "B"
+            }
+          }
+        ]
       }
     },
     "female": {
@@ -1323,6 +2133,8 @@
         "roundOf16": [],
         "quarterFinals": [],
         "semiFinals": [],
+        "fifthPlaceSemiFinals": [],
+        "fifthPlaceFinal": null,
         "final12": null,
         "final34": null,
         "winners": []
@@ -1357,20 +2169,30 @@
     "курукрукрук": 25,
     "укпупукпу": 26,
     "укпупкуп": 27,
-    "эрали набиевв": 28
+    "эрали набиевв": 28,
+    "ваивапрв": 29,
+    "варврвар": 30,
+    "раврвр": 31,
+    "рварв": 32,
+    "аврар": 33,
+    "ееккк": 34,
+    "укрпкрк": 35,
+    "кркеркр": 36,
+    "укук": 37,
+    "кре": 38,
+    "ер": 39,
+    "еркер": 40,
+    "еркре": 41,
+    "еркерек": 42,
+    "екркер": 43,
+    "рекрекр": 44,
+    "ререкрук": 45,
+    "ерке": 46,
+    "пекр": 47
   },
   "scoreSubmission": {
     "activeRound": 1,
-    "entries": [
-      {
-        "id": "1781078987118-kz1u0n",
-        "playerId": "1780424777918-5os7rf",
-        "playerName": "Эрали Набиевв",
-        "round": 1,
-        "score": 11,
-        "submittedAt": "2026-06-10T08:09:47.118Z"
-      }
-    ]
+    "entries": []
   },
   "passwordProtectionEnabled": false,
   "assistantScoringEnabled": true,
@@ -1871,6 +2693,15 @@
       "laneLetter": "D"
     },
     {
+      "id": "1781884603920-m6uupg",
+      "name": "ваивапрв",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 29,
+      "laneLetter": "A"
+    },
+    {
       "id": "1778474338369-ypfw1t",
       "name": "rege",
       "phone": "",
@@ -1878,6 +2709,15 @@
       "gender": "female",
       "entryNumber": 29,
       "laneLetter": "A"
+    },
+    {
+      "id": "1781884604880-a9avit",
+      "name": "варврвар",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 30,
+      "laneLetter": "B"
     },
     {
       "id": "1778474342562-eu35m5",
@@ -1889,6 +2729,15 @@
       "laneLetter": "B"
     },
     {
+      "id": "1781884605915-01sfze",
+      "name": "раврвр",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 31,
+      "laneLetter": "C"
+    },
+    {
       "id": "1778474346552-zsnfxm",
       "name": "regr",
       "phone": "",
@@ -1896,6 +2745,24 @@
       "gender": "female",
       "entryNumber": 31,
       "laneLetter": "C"
+    },
+    {
+      "id": "1781884607305-pazriv",
+      "name": "рварв",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 32,
+      "laneLetter": "D"
+    },
+    {
+      "id": "1781884611968-0i2rpy",
+      "name": "аврар",
+      "phone": "",
+      "password": "",
+      "gender": "female",
+      "entryNumber": 33,
+      "laneLetter": "A"
     },
     {
       "id": "1778502173248-i91qig",
@@ -1907,6 +2774,15 @@
       "laneLetter": "A"
     },
     {
+      "id": "1781885285379-tqgh71",
+      "name": "ееккк",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 34,
+      "laneLetter": "B"
+    },
+    {
       "id": "1778502174049-hkk8ld",
       "name": "укркур",
       "phone": "",
@@ -1914,6 +2790,15 @@
       "gender": "male",
       "entryNumber": 34,
       "laneLetter": "B"
+    },
+    {
+      "id": "1781885286268-gw6bbh",
+      "name": "укрпкрк",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 35,
+      "laneLetter": "C"
     },
     {
       "id": "1778565751678-f8t7kb",
@@ -1932,6 +2817,114 @@
       "gender": "male",
       "entryNumber": 36,
       "laneLetter": "D"
+    },
+    {
+      "id": "1781885286916-404clw",
+      "name": "кркеркр",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 36,
+      "laneLetter": "D"
+    },
+    {
+      "id": "1781885287821-6dp9th",
+      "name": "укук",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 37,
+      "laneLetter": "A"
+    },
+    {
+      "id": "1781885288500-s7d7l3",
+      "name": "кре",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 38,
+      "laneLetter": "B"
+    },
+    {
+      "id": "1781885288892-6vkzny",
+      "name": "ер",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 39,
+      "laneLetter": "C"
+    },
+    {
+      "id": "1781885289757-9s5d3e",
+      "name": "еркер",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 40,
+      "laneLetter": "D"
+    },
+    {
+      "id": "1781885290720-o94t95",
+      "name": "еркре",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 41,
+      "laneLetter": "A"
+    },
+    {
+      "id": "1781885291960-7s0o32",
+      "name": "еркерек",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 42,
+      "laneLetter": "B"
+    },
+    {
+      "id": "1781885292696-hqef5a",
+      "name": "екркер",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 43,
+      "laneLetter": "C"
+    },
+    {
+      "id": "1781885293386-ojhxey",
+      "name": "рекрекр",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 44,
+      "laneLetter": "D"
+    },
+    {
+      "id": "1781885294214-2gg22j",
+      "name": "ререкрук",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 45,
+      "laneLetter": "A"
+    },
+    {
+      "id": "1781885294474-lhl003",
+      "name": "ерке",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 46,
+      "laneLetter": "B"
+    },
+    {
+      "id": "1781885294654-j09qmn",
+      "name": "пекр",
+      "phone": "",
+      "password": "",
+      "gender": "male",
+      "entryNumber": 47,
+      "laneLetter": "C"
     }
   ],
   "rounds": [

@@ -15,6 +15,8 @@ const EMPTY_BRACKET = {
   roundOf16: [],
   quarterFinals: [],
   semiFinals: [],
+  fifthPlaceSemiFinals: [],
+  fifthPlaceFinal: null,
   final12: null,
   final34: null,
   winners: [],
@@ -45,6 +47,8 @@ function createEmptyBracket() {
     roundOf16: [],
     quarterFinals: [],
     semiFinals: [],
+    fifthPlaceSemiFinals: [],
+    fifthPlaceFinal: null,
     final12: null,
     final34: null,
     winners: [],
@@ -66,6 +70,42 @@ function createDefaultCompetitionDivisions() {
     male: createEmptyCompetitionState(),
     female: createEmptyCompetitionState(),
   };
+}
+
+function finalizeStandardMatchForAdvance(match, resolveWinner) {
+  if (!match || match.isFinal) {
+    return match;
+  }
+
+  const nextMatch = { ...match };
+  const mainScoresDiffer = Number(nextMatch.s1) !== Number(nextMatch.s2);
+  if (mainScoresDiffer && (nextMatch.submittedP1 || nextMatch.submittedP2)) {
+    if (!nextMatch.submittedP1 && Number(nextMatch.s1) === 0) {
+      nextMatch.submittedP1 = true;
+    }
+
+    if (!nextMatch.submittedP2 && Number(nextMatch.s2) === 0) {
+      nextMatch.submittedP2 = true;
+    }
+  }
+
+  const shootOffScoresDiffer = Number(nextMatch.shootOffS1) !== Number(nextMatch.shootOffS2);
+  if (
+    Number(nextMatch.s1) === Number(nextMatch.s2) &&
+    shootOffScoresDiffer &&
+    (nextMatch.submittedShootOffP1 || nextMatch.submittedShootOffP2)
+  ) {
+    if (!nextMatch.submittedShootOffP1 && Number(nextMatch.shootOffS1) === 0) {
+      nextMatch.submittedShootOffP1 = true;
+    }
+
+    if (!nextMatch.submittedShootOffP2 && Number(nextMatch.shootOffS2) === 0) {
+      nextMatch.submittedShootOffP2 = true;
+    }
+  }
+
+  nextMatch.winner = resolveWinner(nextMatch);
+  return nextMatch;
 }
 
 const DEFAULT_STATE = {
@@ -132,6 +172,7 @@ const stageMeta = {
   roundOf16: { label: '1/8 финал', short: '1/8' },
   quarterFinals: { label: 'Чейрек финал', short: '1/4' },
   semiFinals: { label: 'Жарым финал', short: '1/2' },
+  fifthPlace: { label: '5-место', short: '5-место' },
   final12: { label: 'Финал', short: 'Финал' },
   final34: { label: '3-орун үчүн беттеш', short: '3-орун' },
 };
@@ -204,7 +245,7 @@ const createLocalPlayerId = () => `${getTimestamp()}-${Math.random().toString(36
 
 const normalizeCompetitionState = (value) => ({
   playoffMode: [32, 16, 8, 4].includes(Number(value?.playoffMode)) ? Number(value.playoffMode) : 16,
-  playoffStage: ['none', 'roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final'].includes(value?.playoffStage)
+  playoffStage: ['none', 'roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final', 'fifthPlace'].includes(value?.playoffStage)
     ? value.playoffStage
     : 'none',
   playoffFinalRounds: normalizePlayoffFinalRounds(value?.playoffFinalRounds),
@@ -357,6 +398,8 @@ const renamePlayerInBracket = (bracket, playerId, nextName) => ({
   roundOf16: (bracket.roundOf16 || []).map((match) => renamePlayerInMatch(match, playerId, nextName)),
   quarterFinals: (bracket.quarterFinals || []).map((match) => renamePlayerInMatch(match, playerId, nextName)),
   semiFinals: (bracket.semiFinals || []).map((match) => renamePlayerInMatch(match, playerId, nextName)),
+  fifthPlaceSemiFinals: (bracket.fifthPlaceSemiFinals || []).map((match) => renamePlayerInMatch(match, playerId, nextName)),
+  fifthPlaceFinal: bracket.fifthPlaceFinal ? renamePlayerInMatch(bracket.fifthPlaceFinal, playerId, nextName) : null,
   final12: bracket.final12 ? renamePlayerInMatch(bracket.final12, playerId, nextName) : null,
   final34: bracket.final34 ? renamePlayerInMatch(bracket.final34, playerId, nextName) : null,
   winners: (bracket.winners || []).map((entry) =>
@@ -367,11 +410,13 @@ const renamePlayerInBracket = (bracket, playerId, nextName) => ({
 const isEmptyBracket = (bracket) =>
   !bracket.final12 &&
   !bracket.final34 &&
+  !bracket.fifthPlaceFinal &&
   (bracket.winners || []).length === 0 &&
   bracket.roundOf32.length === 0 &&
   bracket.roundOf16.length === 0 &&
   bracket.quarterFinals.length === 0 &&
-  bracket.semiFinals.length === 0;
+  bracket.semiFinals.length === 0 &&
+  (bracket.fifthPlaceSemiFinals || []).length === 0;
 
 const parseStoredState = (raw) => {
   if (!raw) {
@@ -725,7 +770,7 @@ const App = ({ onLogout }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPlayersListExpanded, setIsPlayersListExpanded] = useState(false);
   const [printTarget, setPrintTarget] = useState(null);
-  const [isResetConfirmVisible, setIsResetConfirmVisible] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
   const [apiNotice, setApiNotice] = useState('');
   const isRemoteHydratedRef = useRef(false);
   const skipNextRemoteSaveRef = useRef(false);
@@ -1102,6 +1147,27 @@ const App = ({ onLogout }) => {
           { id: 'female', label: 'Айым', players: sortPlayersForJournal(orderedPlayers.filter((player) => player.gender === 'female')) },
         ].filter((group) => group.players.length > 0)
       : [{ id: viewDivision, label: activeDivisionLabel, players: filteredJournalPlayers }];
+  const resolveWinner = (match) => {
+    const isStandardMatch = !match.isFinal;
+    const hasSubmissionTracking =
+      Object.prototype.hasOwnProperty.call(match, 'submittedP1') ||
+      Object.prototype.hasOwnProperty.call(match, 'submittedP2') ||
+      Object.prototype.hasOwnProperty.call(match, 'submittedShootOffP1') ||
+      Object.prototype.hasOwnProperty.call(match, 'submittedShootOffP2');
+
+    if (isStandardMatch && hasSubmissionTracking && (!match.submittedP1 || !match.submittedP2)) return null;
+    if (match.s1 > match.s2) return match.p1;
+    if (match.s2 > match.s1) return match.p2;
+    if (isStandardMatch) {
+      if (hasSubmissionTracking && (!match.submittedShootOffP1 || !match.submittedShootOffP2)) return null;
+      if (Number(match.shootOffS1) > Number(match.shootOffS2)) return match.p1;
+      if (Number(match.shootOffS2) > Number(match.shootOffS1)) return match.p2;
+      return null;
+    }
+    if (match.s1_bot > match.s2_bot) return match.p1;
+    if (match.s2_bot > match.s1_bot) return match.p2;
+    return null;
+  };
   const playoffStages = visibleStageKeys.map((stageKey) => ({
     stageKey,
     title: playoffStageTitles[stageKey] || stageMeta[stageKey].label,
@@ -1114,7 +1180,9 @@ const App = ({ onLogout }) => {
           }
         : null,
   }));
+  const fifthPlaceStages = [];
   const hasFinalMatches = Boolean(bracket.final12 || bracket.final34 || playoffStage === 'final');
+  const reportWinners = [...(bracket.winners || [])].sort((left, right) => left.position - right.position);
   const reportSheetLayout = getReportSheetLayout(playoffMode, bracketStagesForSheet, hasFinalMatches);
 
   const addPlayer = async () => {
@@ -1353,19 +1421,6 @@ const App = ({ onLogout }) => {
     buildBracket(playoffMode);
   };
 
-  const resolveWinner = (match) => {
-    if (match.s1 > match.s2) return match.p1;
-    if (match.s2 > match.s1) return match.p2;
-    if (!match.isFinal) {
-      if (Number(match.shootOffS1) > Number(match.shootOffS2)) return match.p1;
-      if (Number(match.shootOffS2) > Number(match.shootOffS1)) return match.p2;
-      return null;
-    }
-    if (match.s1_bot > match.s2_bot) return match.p1;
-    if (match.s2_bot > match.s1_bot) return match.p2;
-    return null;
-  };
-
   const updateMatch = (stage, matchId, playerNumber, value, roundIndex = 0, scoreType = 'main') => {
     setBracket((prev) => {
       const next = { ...prev };
@@ -1446,6 +1501,17 @@ const App = ({ onLogout }) => {
         return next;
       }
 
+      if (stage === 'fifthPlaceFinal') {
+        const updated = {
+          ...next.fifthPlaceFinal,
+          roundsP1: [...next.fifthPlaceFinal.roundsP1],
+          roundsP2: [...next.fifthPlaceFinal.roundsP2],
+        };
+        applyUpdate(updated);
+        next.fifthPlaceFinal = updated;
+        return next;
+      }
+
       next[stage] = next[stage].map((match) => {
         if (match.id !== matchId) return match;
 
@@ -1473,12 +1539,13 @@ const App = ({ onLogout }) => {
             ? stageKeys[currentStageIndex - 1]
             : currentStage;
       const currentMatches = current.bracket[sourceStage] || [];
+      const normalizedMatches = currentMatches.map((match) => finalizeStandardMatchForAdvance(match, resolveWinner));
 
-      if (!currentMatches.length || currentMatches.some((match) => !match.winner)) {
+      if (!normalizedMatches.length || normalizedMatches.some((match) => !match.winner)) {
         return current;
       }
 
-      const winners = currentMatches.map((match) => match.winner);
+      const winners = normalizedMatches.map((match) => match.winner);
       const nextMatches = [];
 
       if (sourceStage === 'roundOf32') {
@@ -1487,7 +1554,7 @@ const App = ({ onLogout }) => {
         }
         return {
           ...current,
-          bracket: { ...current.bracket, roundOf16: nextMatches },
+          bracket: { ...current.bracket, [sourceStage]: normalizedMatches, roundOf16: nextMatches },
           playoffStage: 'roundOf16',
         };
       }
@@ -1498,7 +1565,7 @@ const App = ({ onLogout }) => {
         }
         return {
           ...current,
-          bracket: { ...current.bracket, quarterFinals: nextMatches },
+          bracket: { ...current.bracket, [sourceStage]: normalizedMatches, quarterFinals: nextMatches },
           playoffStage: 'quarterFinals',
         };
       }
@@ -1509,17 +1576,18 @@ const App = ({ onLogout }) => {
         }
         return {
           ...current,
-          bracket: { ...current.bracket, semiFinals: nextMatches },
+          bracket: { ...current.bracket, [sourceStage]: normalizedMatches, semiFinals: nextMatches },
           playoffStage: 'semiFinals',
         };
       }
 
       if (sourceStage === 'semiFinals') {
-        const losers = currentMatches.map((match) => (match.winner?.id === match.p1.id ? match.p2 : match.p1));
+        const losers = normalizedMatches.map((match) => (match.winner?.id === match.p1.id ? match.p2 : match.p1));
         return {
           ...current,
           bracket: {
             ...current.bracket,
+            [sourceStage]: normalizedMatches,
             final12: createMatch('final12', winners[0], winners[1], true),
             final34: createMatch('final34', losers[0], losers[1], true),
           },
@@ -1544,13 +1612,13 @@ const App = ({ onLogout }) => {
         { position: 2, player: silver },
         { position: 3, player: bracket.final34.winner },
         { position: 4, player: fourth },
+        ...(prev.winners || []).filter((entry) => entry.position === 5),
       ],
     }));
     setActiveTab('report');
   };
 
   const resetTournament = () => {
-    const preservedPlayerDirectory = [...playerDirectory];
     setTournamentName(DEFAULT_STATE.tournamentName);
     setLocation(DEFAULT_STATE.location);
     setCategory(DEFAULT_STATE.category);
@@ -1559,10 +1627,12 @@ const App = ({ onLogout }) => {
     setHeadSecretary(DEFAULT_STATE.headSecretary);
     setCompetitionDivisions(createDefaultCompetitionDivisions());
     setPlayers([]);
-    setPlayerDirectory(preservedPlayerDirectory);
+    setPlayerDirectory([]);
     setPlayerNumberBook({});
     setScores({});
     setScoreSubmission(DEFAULT_SCORE_SUBMISSION);
+    setPasswordProtectionEnabled(DEFAULT_PASSWORD_PROTECTION_ENABLED);
+    setAssistantScoringEnabled(DEFAULT_ASSISTANT_SCORING_ENABLED);
     setViewDivision(DEFAULT_COMPETITION_DIVISION);
     setActiveTab('players');
     setNewPlayerName('');
@@ -1571,21 +1641,32 @@ const App = ({ onLogout }) => {
     setParticipantsSearchQuery('');
     setParticipantsFilter('all');
     setPlayerSearchQuery('');
+    setJournalSearchQuery('');
+    setEditingPlayerId(null);
+    setEditingPlayerName('');
     setIsMenuOpen(false);
     setIsPlayersListExpanded(false);
     setPrintTarget(null);
-    setIsResetConfirmVisible(false);
+    setConfirmAction(null);
   };
 
-  const restartJournal = () => {
+  const restartTournament = () => {
     setCompetitionDivisions(createDefaultCompetitionDivisions());
     setScores({});
     setScoreSubmission({ ...DEFAULT_SCORE_SUBMISSION, entries: [] });
     setViewDivision(DEFAULT_COMPETITION_DIVISION);
     setActiveTab('journal');
+    setPlayoffDivision(DEFAULT_STATE.playoffDivision);
     setJournalSearchQuery('');
+    setParticipantsSearchQuery('');
+    setParticipantsFilter('all');
+    setPlayerSearchQuery('');
+    setEditingPlayerId(null);
+    setEditingPlayerName('');
     setPrintTarget(null);
     setIsMenuOpen(false);
+    setIsPlayersListExpanded(false);
+    setConfirmAction(null);
   };
 
   const handlePrintSheet = (target) => {
@@ -1704,21 +1785,25 @@ const App = ({ onLogout }) => {
           </section>
         )}
 
-        {isResetConfirmVisible && (
+        {confirmAction && (
           <section className="confirm-banner">
             <div>
               <p className="eyebrow">Ырастоо</p>
-              <h3 className="confirm-banner__title">Баарын тазалоону чын эле каалайсызбы?</h3>
+              <h3 className="confirm-banner__title">
+                {confirmAction === 'clearAll' ? 'Баарын толук өчүрүүнү чын эле каалайсызбы?' : 'Турнирди башынан баштоону чын эле каалайсызбы?'}
+              </h3>
               <p className="confirm-banner__text">
-                Катышуучулар, журнал, рейтинг, плей-офф жана колдонуучунун панели тазаланат. `Оюнчу тизмеси` гана сакталат.
+                {confirmAction === 'clearAll'
+                  ? 'Катышуучулар, телефондор, сырсөздөр, журнал, рейтинг, плей-офф, жыйынтыктар, жардамчы жана колдонуучу сайты толугу менен тазаланат.'
+                  : 'Катышуучулар сакталат, бирок журнал, упайлар, рейтинг, плей-офф, жыйынтыктар жана отчет баштапкы абалга түшүрүлөт.'}
               </p>
             </div>
             <div className="confirm-banner__actions">
-              <button type="button" className="ghost-button" onClick={() => setIsResetConfirmVisible(false)}>
+              <button type="button" className="ghost-button" onClick={() => setConfirmAction(null)}>
                 Жок, артка кайтуу
               </button>
-              <button type="button" className="primary-button" onClick={resetTournament}>
-                Ооба, баарын тазалоо
+              <button type="button" className="primary-button" onClick={confirmAction === 'clearAll' ? resetTournament : restartTournament}>
+                {confirmAction === 'clearAll' ? 'Ооба, баарын өчүрүү' : 'Ооба, башынан баштоо'}
               </button>
             </div>
           </section>
@@ -1769,16 +1854,12 @@ const App = ({ onLogout }) => {
                   <button
                     type="button"
                     className="secondary-button secondary-button--auto"
-                    onClick={() => {
-                      if (window.confirm('Журналды башынан баштайлыбы? Бардык упайлар өчүп, оюнчулар кайрадан 1-айлампадан упай жибере алышат.')) {
-                        restartJournal();
-                      }
-                    }}
+                    onClick={() => setConfirmAction('restart')}
                   >
-                    <RefreshIcon size={16} /> Башынан баштоо
+                    <RefreshIcon size={16} /> Начать заново
                   </button>
-                  <button type="button" onClick={() => setIsResetConfirmVisible(true)} className="ghost-button">
-                    <RefreshIcon size={16} /> Баарын тазалоо
+                  <button type="button" onClick={() => setConfirmAction('clearAll')} className="ghost-button">
+                    <RefreshIcon size={16} /> Очистить всё
                   </button>
                 </div>
               </div>
@@ -2538,6 +2619,18 @@ const App = ({ onLogout }) => {
                 />
               ))}
 
+              {fifthPlaceStages.map((stage) => (
+                <StageColumn
+                  key={stage.stageKey}
+                  stageKey={stage.stageKey}
+                  title={stage.title}
+                  playoffMode={4}
+                  matches={stage.matches}
+                  action={stage.action}
+                  onMatchUpdate={(matchId, playerNumber, value, scoreType) => updateMatch(stage.stageKey, matchId, playerNumber, value, 0, scoreType)}
+                />
+              ))}
+
               {hasFinalMatches && (
                 <div className="stage-column stage-column--final">
                   <div className="stage-column__header">
@@ -2545,97 +2638,103 @@ const App = ({ onLogout }) => {
                     <h4>{playoffStageTitles.final12}</h4>
                   </div>
 
-                  <div className="score-round-manager score-round-manager--compact">
-                    <div className="score-round-manager__summary">
-                      <span className="pill">А{playoffFinalRounds.final12}</span>
-                    </div>
+                  <div className="stage-column__final-matches final-stack final-stack--admin">
+                    {bracket.final12 && (
+                      <div className="final-stack__item final-stack__item--front">
+                        <div className="score-round-manager score-round-manager--compact">
+                          <div className="score-round-manager__summary">
+                            <span className="pill">А{playoffFinalRounds.final12}</span>
+                          </div>
 
-                    <div className="mode-switch mode-switch--compact">
-                      {ROUNDS.slice(0, playoffFinalRounds.final12).map((round) => (
-                        <button
-                          key={`final12-round-${round}`}
-                          type="button"
-                          className={`mode-switch__button ${playoffFinalRounds.final12 === round ? 'mode-switch__button--active' : ''}`}
-                          onClick={() => openPlayoffFinalRound('final12', round)}
-                        >
-                          А{round}
-                        </button>
-                      ))}
-                      <button
-                        type="button"
-                        className="mode-switch__button mode-switch__button--plus"
-                        onClick={() => openPreviousPlayoffFinalRound('final12')}
-                        disabled={playoffFinalRounds.final12 <= 1}
-                        aria-label="Мурунку айлампа"
-                      >
-                        -
-                      </button>
-                      <button
-                        type="button"
-                        className="mode-switch__button mode-switch__button--plus"
-                        onClick={() => openNextPlayoffFinalRound('final12')}
-                        disabled={playoffFinalRounds.final12 >= ROUNDS.length}
-                        aria-label="Кийинки айлампа"
-                      >
-                        +
-                      </button>
-                    </div>
+                          <div className="mode-switch mode-switch--compact">
+                            {ROUNDS.slice(0, playoffFinalRounds.final12).map((round) => (
+                              <button
+                                key={`final12-round-${round}`}
+                                type="button"
+                                className={`mode-switch__button ${playoffFinalRounds.final12 === round ? 'mode-switch__button--active' : ''}`}
+                                onClick={() => openPlayoffFinalRound('final12', round)}
+                              >
+                                А{round}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              className="mode-switch__button mode-switch__button--plus"
+                              onClick={() => openPreviousPlayoffFinalRound('final12')}
+                              disabled={playoffFinalRounds.final12 <= 1}
+                              aria-label="Мурунку айлампа"
+                            >
+                              -
+                            </button>
+                            <button
+                              type="button"
+                              className="mode-switch__button mode-switch__button--plus"
+                              onClick={() => openNextPlayoffFinalRound('final12')}
+                              disabled={playoffFinalRounds.final12 >= ROUNDS.length}
+                              aria-label="Кийинки айлампа"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        <Match
+                          match={bracket.final12}
+                          isFinal
+                          activeRound={playoffFinalRounds.final12}
+                          onUpdate={(playerNumber, value, roundIndex) => updateMatch('final12', null, playerNumber, value, roundIndex)}
+                        />
+                      </div>
+                    )}
+
+                    {bracket.final34 && (
+                      <div className="final-stack__item final-stack__item--back">
+                        <div className="score-round-manager score-round-manager--compact">
+                          <div className="score-round-manager__summary">
+                            <span className="pill">А{playoffFinalRounds.final34}</span>
+                          </div>
+
+                          <div className="mode-switch mode-switch--compact">
+                            {ROUNDS.slice(0, playoffFinalRounds.final34).map((round) => (
+                              <button
+                                key={`final34-round-${round}`}
+                                type="button"
+                                className={`mode-switch__button ${playoffFinalRounds.final34 === round ? 'mode-switch__button--active' : ''}`}
+                                onClick={() => openPlayoffFinalRound('final34', round)}
+                              >
+                                А{round}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              className="mode-switch__button mode-switch__button--plus"
+                              onClick={() => openPreviousPlayoffFinalRound('final34')}
+                              disabled={playoffFinalRounds.final34 <= 1}
+                              aria-label="Мурунку айлампа 3-4"
+                            >
+                              -
+                            </button>
+                            <button
+                              type="button"
+                              className="mode-switch__button mode-switch__button--plus"
+                              onClick={() => openNextPlayoffFinalRound('final34')}
+                              disabled={playoffFinalRounds.final34 >= ROUNDS.length}
+                              aria-label="Кийинки айлампа 3-4"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        <Match
+                          match={bracket.final34}
+                          isFinal
+                          activeRound={playoffFinalRounds.final34}
+                          onUpdate={(playerNumber, value, roundIndex) => updateMatch('final34', null, playerNumber, value, roundIndex)}
+                        />
+                      </div>
+                    )}
                   </div>
-
-                  {bracket.final12 && (
-                    <Match
-                      match={bracket.final12}
-                      isFinal
-                      activeRound={playoffFinalRounds.final12}
-                      onUpdate={(playerNumber, value, roundIndex) => updateMatch('final12', null, playerNumber, value, roundIndex)}
-                    />
-                  )}
-
-                  <div className="score-round-manager score-round-manager--compact">
-                    <div className="score-round-manager__summary">
-                      <span className="pill">А{playoffFinalRounds.final34}</span>
-                    </div>
-
-                    <div className="mode-switch mode-switch--compact">
-                      {ROUNDS.slice(0, playoffFinalRounds.final34).map((round) => (
-                        <button
-                          key={`final34-round-${round}`}
-                          type="button"
-                          className={`mode-switch__button ${playoffFinalRounds.final34 === round ? 'mode-switch__button--active' : ''}`}
-                          onClick={() => openPlayoffFinalRound('final34', round)}
-                        >
-                          А{round}
-                        </button>
-                      ))}
-                      <button
-                        type="button"
-                        className="mode-switch__button mode-switch__button--plus"
-                        onClick={() => openPreviousPlayoffFinalRound('final34')}
-                        disabled={playoffFinalRounds.final34 <= 1}
-                        aria-label="Мурунку айлампа 3-4"
-                      >
-                        -
-                      </button>
-                      <button
-                        type="button"
-                        className="mode-switch__button mode-switch__button--plus"
-                        onClick={() => openNextPlayoffFinalRound('final34')}
-                        disabled={playoffFinalRounds.final34 >= ROUNDS.length}
-                        aria-label="Кийинки айлампа 3-4"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {bracket.final34 && (
-                    <Match
-                      match={bracket.final34}
-                      isFinal
-                      activeRound={playoffFinalRounds.final34}
-                      onUpdate={(playerNumber, value, roundIndex) => updateMatch('final34', null, playerNumber, value, roundIndex)}
-                    />
-                  )}
 
                   {playoffStage === 'final' && (
                     <button type="button" onClick={finishTournament} className="primary-button primary-button--wide">
@@ -2686,8 +2785,16 @@ const App = ({ onLogout }) => {
                     )}
 
                     <div className="report-bracket-layout__finals">
-                      {bracket.final12 && <ReportPaperFinalBlock title="Финал 1-2-орунга" match={bracket.final12} />}
-                      {bracket.final34 && <ReportPaperFinalBlock title="Финал 3-4-орунга" match={bracket.final34} />}
+                      {bracket.final12 && (
+                        <div className="final-stack__item final-stack__item--front">
+                          <ReportPaperFinalBlock title="Финал 1-2-орунга" match={bracket.final12} />
+                        </div>
+                      )}
+                      {bracket.final34 && (
+                        <div className="final-stack__item final-stack__item--back">
+                          <ReportPaperFinalBlock title="Финал 3-4-орунга" match={bracket.final34} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2695,69 +2802,98 @@ const App = ({ onLogout }) => {
 
               <section className="report-sheet__footer">
                 <div className="report-places">
-                  <table className="report-places__table">
-                    <tbody>
-                      {bracket.winners.length > 0 ? (
-                        [...bracket.winners]
-                          .sort((left, right) => left.position - right.position)
-                          .map((entry) => (
-            <tr key={entry.player.id} className={entry.position === 1 ? 'report-places__row report-places__row--winner' : 'report-places__row'}>
-              <td>{entry.position}</td>
-              <td>
-                <span>{entry.player.name}</span>
-                {entry.autoRecalculated && <span className="report-place-badge">обновлено</span>}
-              </td>
-            </tr>
-                          ))
-                      ) : (
-                        <tr>
-                          <td colSpan="2">Жеңүүчүлөр азырынча аныктала элек.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                  <div className="report-places__groups">
-                    {bracket.winners.length > 0 ? (
+                  {(() => {
+                    const fifthEntry = reportWinners.find((item) => item.position === 5);
+                    return (
                       <>
-                        <div className="report-places__group">
+                        <table className="report-places__table">
+                          <tbody>
+                            {reportWinners.length > 0 ? (
+                              [...reportWinners]
+                                .sort((left, right) => left.position - right.position)
+                                .filter((entry) => entry.position !== 5)
+                                .map((entry) => (
+                                  <tr key={entry.player.id} className={entry.position === 1 ? 'report-places__row report-places__row--winner' : 'report-places__row'}>
+                                    <td>{entry.position}</td>
+                                    <td>
+                                      <span>{entry.player.name}</span>
+                                      {entry.autoRecalculated && <span className="report-place-badge">обновлено</span>}
+                                    </td>
+                                  </tr>
+                                ))
+                            ) : (
+                              <tr>
+                                <td colSpan="2">Жеңүүчүлөр азырынча аныктала элек.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                        {fifthEntry ? (
+                          <div className="report-places__fifth-inline">
+                            <span className="report-places__fifth-position">{fifthEntry.position}</span>
+                            <span className="report-places__fifth-name">
+                              <span>{fifthEntry.player.name}</span>
+                              {fifthEntry.autoRecalculated && <span className="report-place-badge">обновлено</span>}
+                            </span>
+                          </div>
+                        ) : null}
+                      </>
+                    );
+                  })()}
+                  <div className="report-places__groups">
+                    {reportWinners.length > 0 ? (
+                      <>
+                        <div className="report-places__group final-stack final-stack--places">
                           {[1, 2].map((position) => {
-                            const entry = bracket.winners.find((item) => item.position === position);
-                            return entry ? (
-                              <div
-                                key={entry.player.id}
-                                className={`report-place-card ${entry.position === 1 ? 'report-place-card--winner' : ''}`}
-                              >
-                                <span className="report-place-card__position">{entry.position}</span>
-                                <span className="report-place-card__name">
-                                  <span>{entry.player.name}</span>
-                                  {entry.autoRecalculated && <span className="report-place-badge">обновлено</span>}
-                                </span>
-                              </div>
-                            ) : (
-                              <div key={`missing-${position}`} className="report-place-card report-place-card--empty">
-                                {position}-орун бош
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="report-places__group">
+                              const entry = reportWinners.find((item) => item.position === position);
+                              return entry ? (
+                                <div
+                                  key={entry.player.id}
+                                  className={`report-place-card ${entry.position === 1 ? 'report-place-card--winner' : ''}`}
+                                >
+                                  <span className="report-place-card__position">{entry.position}</span>
+                                  <span className="report-place-card__name">
+                                    <span>{entry.player.name}</span>
+                                    {entry.autoRecalculated && <span className="report-place-badge">обновлено</span>}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div key={`missing-${position}`} className="report-place-card report-place-card--empty">
+                                  {position}-орун бош
+                                </div>
+                              );
+                            })}
                           {[3, 4].map((position) => {
-                            const entry = bracket.winners.find((item) => item.position === position);
-                            return entry ? (
-                              <div key={entry.player.id} className="report-place-card">
-                                <span className="report-place-card__position">{entry.position}</span>
-                                <span className="report-place-card__name">
-                                  <span>{entry.player.name}</span>
-                                  {entry.autoRecalculated && <span className="report-place-badge">обновлено</span>}
-                                </span>
-                              </div>
-                            ) : (
-                              <div key={`missing-${position}`} className="report-place-card report-place-card--empty">
-                                {position}-орун бош
-                              </div>
-                            );
-                          })}
+                              const entry = reportWinners.find((item) => item.position === position);
+                              return entry ? (
+                                <div key={entry.player.id} className="report-place-card report-place-card--back">
+                                  <span className="report-place-card__position">{entry.position}</span>
+                                  <span className="report-place-card__name">
+                                    <span>{entry.player.name}</span>
+                                    {entry.autoRecalculated && <span className="report-place-badge">обновлено</span>}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div key={`missing-${position}`} className="report-place-card report-place-card--empty">
+                                  {position}-орун бош
+                                </div>
+                              );
+                            })}
                         </div>
+                        {(() => {
+                            const entry = reportWinners.find((item) => item.position === 5);
+                            return entry ? (
+                              <div className="report-places__group report-places__group--fifth">
+                                <div key={entry.player.id} className="report-place-card report-place-card--fifth">
+                                  <span className="report-place-card__position">{entry.position}</span>
+                                  <span className="report-place-card__name">
+                                    <span>{entry.player.name}</span>
+                                    {entry.autoRecalculated && <span className="report-place-badge">обновлено</span>}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
                       </>
                     ) : (
                       <div className="report-place-card report-place-card--empty">Жеңүүчүлөр азырынча аныктала элек.</div>
@@ -2809,7 +2945,7 @@ const App = ({ onLogout }) => {
 const StageColumn = ({ stageKey, title, playoffMode, matches, onMatchUpdate, action }) => {
   const roundIndex = getRoundIndex(playoffMode, stageKey);
   const roundFactor = 2 ** Math.max(roundIndex, 0);
-  const slotCount = getStageMatchCount(playoffMode, stageKey);
+  const slotCount = stageKey === 'fifthPlaceSemiFinals' || stageKey === 'fifthPlaceFinal' ? matches.length : getStageMatchCount(playoffMode, stageKey);
   const slotStageClassName = `bracket-match-slot--${stageKey}`;
   const connectorStageClassName = `bracket-match-slot__connector--${stageKey}`;
   const editableConnectorClassName =
@@ -3130,6 +3266,20 @@ const ReportPaperFinalBlock = ({ title, match }) => (
         rounds={match.roundsP2}
         isWinner={match.winner?.id === match.p2.id}
       />
+    </div>
+  </article>
+);
+
+const ReportPaperPlaceBlock = ({ title, position, player }) => (
+  <article className="report-final-block report-final-block--place">
+    <div className="report-final-block__title">
+      {title}
+    </div>
+    <div className="report-final-block__body">
+      <div className="report-place-row">
+        <span className="report-place-row__position">{position}</span>
+        <span className="report-place-row__name">{player?.name || 'Аныктала элек'}</span>
+      </div>
     </div>
   </article>
 );

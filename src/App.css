@@ -1221,6 +1221,13 @@
   margin-top: 20px;
 }
 
+.playoff-extra-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 18px 0;
+}
+
 .bracket-grid {
   --bracket-column-width: 250px;
   --bracket-column-gap: 54px;
@@ -1254,6 +1261,8 @@
 
 .stage-column--final {
   gap: 16px;
+  width: calc((var(--bracket-column-width) * 2) + 18px);
+  max-width: calc(100vw - 48px);
 }
 
 .stage-column__header {
@@ -1560,6 +1569,79 @@
   background: rgba(248, 250, 252, 0.75);
 }
 
+.final-stack {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, var(--bracket-column-width)));
+  gap: 18px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  isolation: isolate;
+}
+
+.final-stack__item {
+  min-width: 0;
+  width: 100%;
+  margin-top: 00px;
+}
+
+.final-stack__item--front {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  z-index: 2;
+}
+
+.final-stack__item--back {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  z-index: 1;
+  transform: none;
+  opacity: 1;
+  margin-top: 200px;
+  left: 9px;
+}
+
+.final-stack__item--back .match-card {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+}
+
+.final-stack__item:only-child {
+  grid-column: 1 / -1;
+  max-width: var(--bracket-column-width);
+}
+
+.final-stack--admin,
+.final-stack--assistant {
+  gap: 18px;
+  padding: 0;
+}
+
+.final-stack--admin .final-stack__item,
+.final-stack--assistant .final-stack__item {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.final-stack--admin .final-stack__item > *,
+.final-stack--assistant .final-stack__item > * {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.final-stack--admin .match-card--final,
+.final-stack--assistant .match-card--final,
+.final-stack--admin .score-round-manager,
+.final-stack--assistant .score-round-manager {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .report-page {
   display: grid;
   gap: 20px;
@@ -1833,25 +1915,24 @@
 
 .report-bracket-layout__finals {
   position: relative;
-  display: block;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
   width: var(--report-finals-width);
-  min-height: calc(var(--report-stage-match-height) * 2 + 22px);
+  min-height: 0;
   align-self: start;
+  padding: 0;
 }
 
-.report-bracket-layout__finals > .report-final-block {
-  position: relative;
+.report-bracket-layout__extras {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  justify-content: start;
 }
 
-.report-bracket-layout__finals > .report-final-block:first-child {
-  z-index: 2;
-}
-
-.report-bracket-layout__finals > .report-final-block + .report-final-block {
-  margin-top: -14px;
-  margin-left: 10px;
-  z-index: 1;
-  opacity: 0.96;
+.report-bracket-layout__extra-block {
+  width: var(--report-finals-width);
 }
 
 .report-empty-state {
@@ -1962,6 +2043,31 @@
   background: #fff;
   border-radius: 8px;
   overflow: hidden;
+}
+
+.report-final-block--place .report-final-block__body {
+  display: block;
+}
+
+.report-place-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  min-height: 34px;
+}
+
+.report-place-row__position {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid #000;
+  min-height: 34px;
+  font-weight: 700;
+}
+
+.report-place-row__name {
+  padding: 4px 8px;
+  font-weight: 600;
 }
 
 .report-final-block__title {
@@ -2275,6 +2381,49 @@
 .report-places__group {
   display: grid;
   gap: 10px;
+}
+
+.report-places__group--fifth {
+  margin-top: 22px;
+  padding: 0 0 0 12px;
+}
+
+.report-places__group.final-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: 1fr;
+  padding: 0 0 14px 12px;
+}
+
+.report-places__group.final-stack .report-place-card {
+  min-width: 0;
+}
+
+.report-places__group.final-stack .report-place-card:nth-child(1),
+.report-places__group.final-stack .report-place-card:nth-child(3) {
+  grid-area: 1 / 1;
+}
+
+.report-places__group.final-stack .report-place-card:nth-child(2),
+.report-places__group.final-stack .report-place-card:nth-child(4) {
+  grid-area: 1 / 2;
+}
+
+.report-places__group.final-stack .report-place-card:nth-child(1),
+.report-places__group.final-stack .report-place-card:nth-child(2) {
+  position: relative;
+  z-index: 2;
+}
+
+.report-place-card--back {
+  position: relative;
+  z-index: 1;
+  transform: translate(-12px, 14px);
+  opacity: 0.94;
+}
+
+.report-place-card--fifth {
+  max-width: calc(50% - 6px);
+  margin-left: auto;
 }
 
 .report-place-card {
@@ -3330,6 +3479,25 @@
   border-color: rgba(100, 116, 139, 0.82);
 }
 
+:root[data-theme='dark'] .report-sheet__topline,
+:root[data-theme='dark'] .report-section-heading span {
+  color: rgba(226, 232, 240, 0.78);
+}
+
+:root[data-theme='dark'] .report-sheet__header h2 {
+  color: #f8fafc;
+}
+
+:root[data-theme='dark'] .report-sheet__badge,
+:root[data-theme='dark'] .report-sheet__meta,
+:root[data-theme='dark'] .report-section-heading strong {
+  color: #e2e8f0;
+}
+
+:root[data-theme='dark'] .report-sheet__header {
+  border-bottom-color: rgba(71, 85, 105, 0.5);
+}
+
 :root[data-theme='dark'] .report-sheet,
 :root[data-theme='dark'] .report-match-card,
 :root[data-theme='dark'] .report-final-block,
@@ -4069,6 +4237,45 @@
 }
 
 @media (max-width: 1100px) {
+  .final-stack {
+    grid-template-columns: repeat(2, minmax(210px, var(--bracket-column-width)));
+    gap: 14px;
+    padding: 0;
+  }
+
+  .final-stack__item--back {
+    transform: none;
+  }
+
+  .final-stack--admin,
+  .final-stack--assistant {
+    padding: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .final-stack {
+    grid-template-columns: repeat(2, minmax(190px, var(--bracket-column-width)));
+    gap: 12px;
+    padding: 0;
+  }
+
+  .final-stack__item--back {
+    transform: none;
+    opacity: 1;
+  }
+
+  .final-stack--admin,
+  .final-stack--assistant {
+    padding: 0;
+  }
+
+  .report-place-card--back {
+    transform: translate(-8px, 10px);
+  }
+}
+
+@media (max-width: 1100px) {
   .admin-shell .admin-sidebar {
     position: relative;
     top: auto;
@@ -4374,6 +4581,16 @@
     font-size: 12pt;
   }
 
+  .report-bracket-layout__extras {
+    gap: 6px;
+    margin-top: 4px;
+    justify-content: start;
+  }
+
+  .report-bracket-layout__extra-block {
+    width: 112px;
+  }
+
   .report-stage-column {
     width: 98px;
     gap: 4px;
@@ -4417,6 +4634,16 @@
     width: 112px;
   }
 
+  .report-place-row,
+  .report-place-row__position {
+    min-height: 18pt;
+  }
+
+  .report-place-row__name {
+    font-size: 12pt;
+    padding: 2px 3px;
+  }
+
   .report-final-row__cell {
     height: 14px;
   }
@@ -4432,6 +4659,56 @@
   .report-places__table td {
     padding: 3px 4px;
     font-size: 12pt;
+  }
+
+  #official-report .report-places {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4mm;
+    align-items: start;
+  }
+
+  #official-report .report-places__groups {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3mm !important;
+    width: 100% !important;
+  }
+
+  #official-report .report-places__group,
+  #official-report .report-places__group.final-stack,
+  #official-report .report-places__group--fifth {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    grid-template-rows: none !important;
+    gap: 2mm !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #official-report .report-place-card,
+  #official-report .report-place-card--back,
+  #official-report .report-place-card--fifth,
+  #official-report .report-place-card--winner,
+  #official-report .report-place-card--empty {
+    display: flex !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    transform: none !important;
+    position: static !important;
+    inset: auto !important;
+    opacity: 1 !important;
+    z-index: auto !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  #official-report .report-place-card__position,
+  #official-report .report-place-card__name {
+    font-size: 12pt !important;
   }
 
   .report-match-card,

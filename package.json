@@ -9,7 +9,7 @@
     "dev:admin": "node scripts/dev.mjs admin",
     "dev:assistant": "node scripts/dev.mjs assistant",
     "dev:user": "node scripts/dev.mjs user",
-    "dev:server": "node backend/server.mjs",
+    "dev:server": "node --watch backend/server.mjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

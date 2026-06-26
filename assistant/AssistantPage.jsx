@@ -7,6 +7,8 @@ const EMPTY_BRACKET = {
   roundOf16: [],
   quarterFinals: [],
   semiFinals: [],
+  fifthPlaceSemiFinals: [],
+  fifthPlaceFinal: null,
   final12: null,
   final34: null,
   winners: [],
@@ -39,13 +41,24 @@ const PLAYOFF_STAGE_TITLES = {
   roundOf16: 'Топ-16',
   quarterFinals: 'Топ-8',
   semiFinals: 'Топ-4',
+  fifthPlace: '5-место',
   final: 'Финал',
 }
 
 const ASSISTANT_DRAFTS_STORAGE_KEY = 'assistant_playoff_drafts_v1'
+const FIFTH_PLACE_STAGE_KEYS = ['fifthPlaceSemiFinals', 'fifthPlaceFinal']
 
 const getVisibleStageKeys = (playoffMode) => PLAYOFF_STAGE_KEYS_BY_MODE[playoffMode] || PLAYOFF_STAGE_KEYS_BY_MODE[8]
 const getRoundIndex = (playoffMode, stageKey) => getVisibleStageKeys(playoffMode).indexOf(stageKey)
+const getNextStageKey = (playoffMode, stageKey) => {
+  const stageKeys = getVisibleStageKeys(playoffMode)
+  const stageIndex = stageKeys.indexOf(stageKey)
+  if (stageIndex < 0 || stageIndex >= stageKeys.length - 1) {
+    return null
+  }
+
+  return stageKeys[stageIndex + 1]
+}
 
 const getStageMatchCount = (playoffMode, stageKey) => {
   const roundIndex = getRoundIndex(playoffMode, stageKey)
@@ -90,7 +103,7 @@ const normalizeCompetitionState = (value) => ({
   ...createEmptyCompetitionState(),
   ...(value || {}),
   playoffMode: [32, 16, 8, 4].includes(Number(value?.playoffMode)) ? Number(value.playoffMode) : 16,
-  playoffStage: ['none', 'roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final'].includes(value?.playoffStage)
+  playoffStage: ['none', 'roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final', 'fifthPlace'].includes(value?.playoffStage)
     ? value.playoffStage
     : 'none',
   playoffFinalRounds: {
@@ -115,6 +128,122 @@ const sanitizeScore = (value) => String(value || '').replace(/[^\d]/g, '').slice
 const getStageScoreDraftKey = (divisionId, stageKey, playerId) => `${divisionId}:${stageKey}:${playerId}`
 const getFinalScoreDraftKey = (divisionId, matchId, playerId, roundIndex) => `${divisionId}:${matchId}:${playerId}:${roundIndex}`
 
+const createMatch = (id, p1, p2, isFinal = false) => ({
+  id,
+  p1,
+  p2,
+  s1: 0,
+  s2: 0,
+  shootOffS1: 0,
+  shootOffS2: 0,
+  s1_bot: 0,
+  s2_bot: 0,
+  winner: null,
+  isFinal,
+  roundsP1: Array(12).fill(0),
+  roundsP2: Array(12).fill(0),
+  submittedRoundsP1: Array(6).fill(false),
+  submittedRoundsP2: Array(6).fill(false),
+  submittedShootOffP1: false,
+  submittedShootOffP2: false,
+})
+
+const mergeMatchState = (existingMatch, nextMatch) => {
+  if (!existingMatch || existingMatch.p1?.id !== nextMatch.p1?.id || existingMatch.p2?.id !== nextMatch.p2?.id) {
+    return nextMatch
+  }
+
+  return {
+    ...nextMatch,
+    s1: existingMatch.s1,
+    s2: existingMatch.s2,
+    shootOffS1: existingMatch.shootOffS1,
+    shootOffS2: existingMatch.shootOffS2,
+    s1_bot: existingMatch.s1_bot,
+    s2_bot: existingMatch.s2_bot,
+    winner: existingMatch.winner,
+    roundsP1: Array.isArray(existingMatch.roundsP1) ? [...existingMatch.roundsP1] : [...nextMatch.roundsP1],
+    roundsP2: Array.isArray(existingMatch.roundsP2) ? [...existingMatch.roundsP2] : [...nextMatch.roundsP2],
+    submittedP1: Boolean(existingMatch.submittedP1),
+    submittedP2: Boolean(existingMatch.submittedP2),
+    submittedShootOffP1: Boolean(existingMatch.submittedShootOffP1),
+    submittedShootOffP2: Boolean(existingMatch.submittedShootOffP2),
+  }
+}
+
+const resolvePlayoffWinner = (match) => {
+  if (!match) return null
+  const isStandardMatch = !match.isFinal || match.id === 'fifthPlaceFinal'
+  const hasSubmissionTracking =
+    Object.prototype.hasOwnProperty.call(match, 'submittedP1') ||
+    Object.prototype.hasOwnProperty.call(match, 'submittedP2') ||
+    Object.prototype.hasOwnProperty.call(match, 'submittedShootOffP1') ||
+    Object.prototype.hasOwnProperty.call(match, 'submittedShootOffP2')
+
+  if (isStandardMatch && hasSubmissionTracking && (!match.submittedP1 || !match.submittedP2)) {
+    return null
+  }
+
+  if (Number(match.s1) > Number(match.s2)) return match.p1
+  if (Number(match.s2) > Number(match.s1)) return match.p2
+  if (isStandardMatch) {
+    if (hasSubmissionTracking && (!match.submittedShootOffP1 || !match.submittedShootOffP2)) {
+      return null
+    }
+    if (Number(match.shootOffS1) > Number(match.shootOffS2)) return match.p1
+    if (Number(match.shootOffS2) > Number(match.shootOffS1)) return match.p2
+    return null
+  }
+  if (Number(match.s1_bot) > Number(match.s2_bot)) return match.p1
+  if (Number(match.s2_bot) > Number(match.s1_bot)) return match.p2
+  return null
+}
+
+const finalizeStandardMatchForAdvance = (match, resolveWinner) => {
+  if (!match || (match.isFinal && match.id !== 'fifthPlaceFinal')) {
+    return match
+  }
+
+  const nextMatch = { ...match }
+  const mainScoresDiffer = Number(nextMatch.s1) !== Number(nextMatch.s2)
+  if (mainScoresDiffer && (nextMatch.submittedP1 || nextMatch.submittedP2)) {
+    if (!nextMatch.submittedP1 && Number(nextMatch.s1) === 0) {
+      nextMatch.submittedP1 = true
+    }
+
+    if (!nextMatch.submittedP2 && Number(nextMatch.s2) === 0) {
+      nextMatch.submittedP2 = true
+    }
+  }
+
+  const shootOffScoresDiffer = Number(nextMatch.shootOffS1) !== Number(nextMatch.shootOffS2)
+  if (
+    Number(nextMatch.s1) === Number(nextMatch.s2) &&
+    shootOffScoresDiffer &&
+    (nextMatch.submittedShootOffP1 || nextMatch.submittedShootOffP2)
+  ) {
+    if (!nextMatch.submittedShootOffP1 && Number(nextMatch.shootOffS1) === 0) {
+      nextMatch.submittedShootOffP1 = true
+    }
+
+    if (!nextMatch.submittedShootOffP2 && Number(nextMatch.shootOffS2) === 0) {
+      nextMatch.submittedShootOffP2 = true
+    }
+  }
+
+  nextMatch.winner = resolveWinner(nextMatch)
+  return nextMatch
+}
+
+const getQuarterFinalLosers = (bracket) =>
+  (bracket?.quarterFinals || [])
+    .map((match) => {
+      const winner = resolvePlayoffWinner(match)
+      if (!winner) return null
+      return winner.id === match.p1?.id ? match.p2 : match.p1
+    })
+    .filter(Boolean)
+
 const getStageMatches = (competitionState) => {
   if (!competitionState || competitionState.playoffStage === 'none') {
     return []
@@ -124,7 +253,31 @@ const getStageMatches = (competitionState) => {
     return [competitionState.bracket.final34, competitionState.bracket.final12].filter(Boolean)
   }
 
+  if (competitionState.playoffStage === 'fifthPlace') {
+    return competitionState.bracket.fifthPlaceFinal
+      ? [competitionState.bracket.fifthPlaceFinal]
+      : (competitionState.bracket.fifthPlaceSemiFinals || [])
+  }
+
   return Array.isArray(competitionState.bracket?.[competitionState.playoffStage]) ? competitionState.bracket[competitionState.playoffStage] : []
+}
+
+const getStageMatchesByKey = (competitionState, stageKey) => {
+  if (!competitionState || !stageKey || stageKey === 'none') {
+    return []
+  }
+
+  if (stageKey === 'final') {
+    return [competitionState.bracket.final34, competitionState.bracket.final12].filter(Boolean)
+  }
+
+  if (stageKey === 'fifthPlace') {
+    return competitionState.bracket.fifthPlaceFinal
+      ? [competitionState.bracket.fifthPlaceFinal]
+      : (competitionState.bracket.fifthPlaceSemiFinals || [])
+  }
+
+  return Array.isArray(competitionState.bracket?.[stageKey]) ? competitionState.bracket[stageKey] : []
 }
 
 const getPlayerScore = (match, playerId) => {
@@ -185,6 +338,7 @@ export default function AssistantPage({ onLogout }) {
   const { theme, toggleTheme } = useTheme()
   const [tournamentState, setTournamentState] = useState(createEmptyState)
   const [selectedDivision, setSelectedDivision] = useState('all')
+  const [assistantView, setAssistantView] = useState('main')
   const initialAssistantDraftState = useMemo(() => loadAssistantDraftState(), [])
   const [scoreDrafts, setScoreDrafts] = useState(initialAssistantDraftState.drafts)
   const [savedScoreDrafts, setSavedScoreDrafts] = useState(initialAssistantDraftState.savedDrafts)
@@ -258,10 +412,17 @@ export default function AssistantPage({ onLogout }) {
     () => [...stageOptions, { id: 'final', label: PLAYOFF_STAGE_TITLES.final }],
     [stageOptions],
   )
+  const isFifthPlaceView = assistantView === 'fifthPlace'
+  const currentAssistantStage =
+    isFifthPlaceView
+      ? 'fifthPlace'
+      : activeCompetitionState.playoffStage === 'fifthPlace'
+        ? 'none'
+        : activeCompetitionState.playoffStage
 
   const stageLabel = activeCompetitionState.playoffStage === 'final' ? 'Финал' : PLAYOFF_STAGE_TITLES[activeCompetitionState.playoffStage] || 'Тандоо жок'
   const hasPendingDrafts = useMemo(() => {
-    if (activeCompetitionState.playoffStage === 'final') {
+    if (currentAssistantStage === 'final') {
       return [activeCompetitionState.bracket.final34, activeCompetitionState.bracket.final12]
         .filter(Boolean)
         .some((match) => {
@@ -275,19 +436,30 @@ export default function AssistantPage({ onLogout }) {
         })
     }
 
-    if (!['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals'].includes(activeCompetitionState.playoffStage)) {
+    if (!['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'fifthPlace'].includes(currentAssistantStage)) {
       return false
     }
 
-    return (activeCompetitionState.bracket?.[activeCompetitionState.playoffStage] || []).some((match) =>
+    if (currentAssistantStage === 'fifthPlace') {
+      return FIFTH_PLACE_STAGE_KEYS.some((stageKey) =>
+        getStageMatchesByKey(activeCompetitionState, stageKey).some((match) =>
+          [match?.p1, match?.p2].filter(Boolean).some((player) => {
+            const draftKey = getStageScoreDraftKey(selectedDivision, stageKey, player.id)
+            return sanitizeScore(scoreDrafts[draftKey] || '') !== ''
+          }),
+        ),
+      )
+    }
+
+    return getStageMatchesByKey(activeCompetitionState, currentAssistantStage).some((match) =>
       [match?.p1, match?.p2].filter(Boolean).some((player) => {
-        const draftKey = getStageScoreDraftKey(selectedDivision, activeCompetitionState.playoffStage, player.id)
+        const draftKey = getStageScoreDraftKey(selectedDivision, currentAssistantStage, player.id)
         return sanitizeScore(scoreDrafts[draftKey] || '') !== ''
       }),
     )
-  }, [activeCompetitionState.bracket, activeCompetitionState.playoffFinalRounds.final12, activeCompetitionState.playoffFinalRounds.final34, activeCompetitionState.playoffStage, scoreDrafts, selectedDivision])
+  }, [activeCompetitionState.bracket, activeCompetitionState.playoffFinalRounds.final12, activeCompetitionState.playoffFinalRounds.final34, currentAssistantStage, scoreDrafts, selectedDivision])
   const hasSavedDraftsForCurrentStage = useMemo(() => {
-    if (activeCompetitionState.playoffStage === 'final') {
+    if (currentAssistantStage === 'final') {
       return [activeCompetitionState.bracket.final34, activeCompetitionState.bracket.final12]
         .filter(Boolean)
         .some((match) => {
@@ -301,17 +473,28 @@ export default function AssistantPage({ onLogout }) {
         })
     }
 
-    if (!['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals'].includes(activeCompetitionState.playoffStage)) {
+    if (!['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'fifthPlace'].includes(currentAssistantStage)) {
       return false
     }
 
-    return (activeCompetitionState.bracket?.[activeCompetitionState.playoffStage] || []).some((match) =>
+    if (currentAssistantStage === 'fifthPlace') {
+      return FIFTH_PLACE_STAGE_KEYS.some((stageKey) =>
+        getStageMatchesByKey(activeCompetitionState, stageKey).some((match) =>
+          [match?.p1, match?.p2].filter(Boolean).some((player) => {
+            const draftKey = getStageScoreDraftKey(selectedDivision, stageKey, player.id)
+            return sanitizeScore(savedScoreDrafts[draftKey] || '') !== ''
+          }),
+        ),
+      )
+    }
+
+    return getStageMatchesByKey(activeCompetitionState, currentAssistantStage).some((match) =>
       [match?.p1, match?.p2].filter(Boolean).some((player) => {
-        const draftKey = getStageScoreDraftKey(selectedDivision, activeCompetitionState.playoffStage, player.id)
+        const draftKey = getStageScoreDraftKey(selectedDivision, currentAssistantStage, player.id)
         return sanitizeScore(savedScoreDrafts[draftKey] || '') !== ''
       }),
     )
-  }, [activeCompetitionState.bracket, activeCompetitionState.playoffFinalRounds.final12, activeCompetitionState.playoffFinalRounds.final34, activeCompetitionState.playoffStage, savedScoreDrafts, selectedDivision])
+  }, [activeCompetitionState.bracket, activeCompetitionState.playoffFinalRounds.final12, activeCompetitionState.playoffFinalRounds.final34, currentAssistantStage, savedScoreDrafts, selectedDivision])
   const hasUnsavedDraftChanges = useMemo(() => {
     const currentDraftKeys = Object.keys(scoreDrafts)
     const savedDraftKeys = Object.keys(savedScoreDrafts)
@@ -338,6 +521,212 @@ export default function AssistantPage({ onLogout }) {
     [activeCompetitionState.bracket, activeCompetitionState.playoffStage, stageOptions],
   )
   const hasFinalMatches = Boolean(activeCompetitionState.bracket.final12 || activeCompetitionState.bracket.final34)
+  const canOpenFifthPlace = getQuarterFinalLosers(activeCompetitionState.bracket).length === 4
+  const hasFifthPlaceBracket = Boolean((activeCompetitionState.bracket.fifthPlaceSemiFinals || []).length || activeCompetitionState.bracket.fifthPlaceFinal)
+  const fifthPlaceWinner = activeCompetitionState.bracket.fifthPlaceFinal?.winner || null
+  const fifthPlaceSavedToReport = Boolean((activeCompetitionState.bracket.winners || []).some((entry) => entry.position === 5))
+  const fifthPlaceStages = [
+    {
+      id: 'fifthPlaceSemiFinals',
+      label: PLAYOFF_STAGE_TITLES.fifthPlace,
+      matches: activeCompetitionState.bracket.fifthPlaceSemiFinals || [],
+    },
+    {
+      id: 'fifthPlaceFinal',
+      label: '5-место финал',
+      matches: activeCompetitionState.bracket.fifthPlaceFinal ? [activeCompetitionState.bracket.fifthPlaceFinal] : [],
+    },
+  ].filter((stage) => stage.matches.length > 0)
+
+  const handleSendFifthPlaceToReport = async () => {
+    setIsSaving(true)
+    try {
+      const latestState = normalizeState(await fetchTournamentState())
+      setTournamentState(latestState)
+      const currentDivisionState = normalizeCompetitionState(latestState.competitionDivisions?.[selectedDivision])
+      const resolvedFifthPlaceWinner = currentDivisionState.bracket.fifthPlaceFinal?.winner || null
+
+      if (!resolvedFifthPlaceWinner) {
+        setStatusMessage('5-местонун жеңүүчүсү азырынча аныктала элек.')
+        return
+      }
+
+      const savedState = await saveSelectedDivisionState(
+        latestState,
+        {
+          ...currentDivisionState,
+          bracket: {
+            ...currentDivisionState.bracket,
+            winners: [
+              ...(currentDivisionState.bracket.winners || []).filter((entry) => entry.position !== 5),
+              { position: 5, player: resolvedFifthPlaceWinner },
+            ].sort((left, right) => left.position - right.position),
+          },
+        },
+        `${resolvedFifthPlaceWinner.name} отчётко 5-место болуп кошулду.`,
+      )
+      setTournamentState(savedState)
+      setAssistantView('fifthPlace')
+    } catch (error) {
+      setStatusMessage(error.message || '5-местону отчётко жөнөтүү мүмкүн болгон жок.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const saveSelectedDivisionState = async (latestState, nextDivisionState, message) => {
+    const nextState = normalizeState({
+      ...latestState,
+      competitionDivisions: {
+        ...latestState.competitionDivisions,
+        [selectedDivision]: normalizeCompetitionState(nextDivisionState),
+      },
+    })
+    const savedState = normalizeState(await saveTournamentState(nextState))
+    setTournamentState(savedState)
+    setStatusMessage(message)
+    return savedState
+  }
+
+  const handleOpenFifthPlace = async () => {
+    setIsSaving(true)
+    try {
+      let latestState = normalizeState(await fetchTournamentState())
+      setTournamentState(latestState)
+      if (hasPendingDrafts) {
+        latestState = (await handleBatchSubmit(scoreDrafts, true)) || latestState
+      }
+
+      const currentDivisionState = normalizeCompetitionState(latestState.competitionDivisions?.[selectedDivision])
+      if ((currentDivisionState.bracket.fifthPlaceSemiFinals || []).length || currentDivisionState.bracket.fifthPlaceFinal) {
+        if (currentDivisionState.playoffStage !== 'fifthPlace') {
+          await saveSelectedDivisionState(
+            latestState,
+            {
+              ...currentDivisionState,
+              playoffStage: 'fifthPlace',
+            },
+            '5-РјРµСЃС‚Рѕ Р±РµС‚Рё Р°С‡С‹Р»РґС‹.',
+          )
+        }
+        setAssistantView('fifthPlace')
+        return
+      }
+      const losers = getQuarterFinalLosers(currentDivisionState.bracket)
+      if (losers.length !== 4) {
+        setStatusMessage('5-место үчүн Топ-8деги 4 утулган оюнчу керек.')
+        return
+      }
+
+      const existingSemiFinals = currentDivisionState.bracket.fifthPlaceSemiFinals || []
+      await saveSelectedDivisionState(
+        latestState,
+        {
+          ...currentDivisionState,
+          playoffStage: 'fifthPlace',
+          bracket: {
+            ...currentDivisionState.bracket,
+            fifthPlaceSemiFinals: [
+              mergeMatchState(existingSemiFinals[0], createMatch('fifthPlaceSemiFinals-0', losers[0], losers[1])),
+              mergeMatchState(existingSemiFinals[1], createMatch('fifthPlaceSemiFinals-1', losers[2], losers[3])),
+            ],
+          },
+        },
+        '5-место ачылды.',
+      )
+      setAssistantView('fifthPlace')
+    } catch (error) {
+      setStatusMessage(error.message || '5-место ачуу мүмкүн болгон жок.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleFifthPlaceForward = async () => {
+    setIsSaving(true)
+    try {
+      let latestState = normalizeState(await fetchTournamentState())
+      setTournamentState(latestState)
+      const hadFifthPlaceFinal = Boolean(normalizeCompetitionState(latestState.competitionDivisions?.[selectedDivision]).bracket.fifthPlaceFinal)
+      if (hasPendingDrafts) {
+        latestState = (await handleBatchSubmit(scoreDrafts, true)) || latestState
+        latestState = normalizeState(await fetchTournamentState())
+        setTournamentState(latestState)
+      }
+
+      const currentDivisionState = normalizeCompetitionState(latestState.competitionDivisions?.[selectedDivision])
+
+      if (!hadFifthPlaceFinal && currentDivisionState.bracket.fifthPlaceFinal) {
+        setStatusMessage('5-РјРµСЃС‚РѕРЅСѓРЅ С„РёРЅР°Р»С‹ Р°С‡С‹Р»РґС‹.')
+        setAssistantView('fifthPlace')
+        return
+      }
+
+      if (!currentDivisionState.bracket.fifthPlaceFinal) {
+        const semiFinals = (currentDivisionState.bracket.fifthPlaceSemiFinals || []).map((match) =>
+          finalizeStandardMatchForAdvance(match, resolvePlayoffWinner),
+        )
+        const winners = semiFinals.map((match) => resolvePlayoffWinner(match))
+        if (semiFinals.length !== 2 || winners.some((winner) => !winner)) {
+          setStatusMessage('Адегенде 5-местонун эки беттешинин упайын толтуруңуз.')
+          return
+        }
+
+        const savedState = await saveSelectedDivisionState(
+          latestState,
+          {
+            ...currentDivisionState,
+            playoffStage: 'fifthPlace',
+            bracket: {
+              ...currentDivisionState.bracket,
+              fifthPlaceSemiFinals: semiFinals,
+              fifthPlaceFinal: mergeMatchState(currentDivisionState.bracket.fifthPlaceFinal, createMatch('fifthPlaceFinal', winners[0], winners[1])),
+            },
+          },
+          '5-местонун финалы ачылды.',
+        )
+        setTournamentState(savedState)
+        setAssistantView('fifthPlace')
+        return
+      }
+
+      const normalizedFifthPlaceFinal = finalizeStandardMatchForAdvance(
+        currentDivisionState.bracket.fifthPlaceFinal,
+        resolvePlayoffWinner,
+      )
+      const fifthWinner = resolvePlayoffWinner(normalizedFifthPlaceFinal)
+      if (!fifthWinner) {
+        setStatusMessage('5-местонун финалындагы упайлар толук эмес.')
+        return
+      }
+
+      const savedState = await saveSelectedDivisionState(
+        latestState,
+        {
+          ...currentDivisionState,
+          playoffStage: 'fifthPlace',
+          bracket: {
+            ...currentDivisionState.bracket,
+            fifthPlaceFinal: {
+              ...normalizedFifthPlaceFinal,
+              winner: fifthWinner,
+            },
+            winners: [
+              ...(currentDivisionState.bracket.winners || []).filter((entry) => entry.position !== 5),
+              { position: 5, player: fifthWinner },
+            ].sort((left, right) => left.position - right.position),
+          },
+        },
+        `${fifthWinner.name} 5-место алып, отчётко кошулду.`,
+      )
+      setTournamentState(savedState)
+      setAssistantView('fifthPlace')
+    } catch (error) {
+      setStatusMessage(error.message || '5-местону алдыга жылдыруу мүмкүн болгон жок.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const handleAssistantToggle = async (nextValue) => {
     setIsSaving(true)
@@ -381,6 +770,140 @@ export default function AssistantPage({ onLogout }) {
       setStatusMessage(stageKey === 'final' ? '????? ??????.' : `${PLAYOFF_STAGE_TITLES[stageKey] || '????'} ??????.`)
     } catch (error) {
       setStatusMessage(error.message || '?????? ???????? ?????? ?????? ???.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handlePlayoffForward = async () => {
+    setIsSaving(true)
+    try {
+      let latestState = normalizeState(await fetchTournamentState())
+      setTournamentState(latestState)
+
+      if (hasPendingDrafts) {
+        latestState = (await handleBatchSubmit(scoreDrafts)) || latestState
+        latestState = normalizeState(await fetchTournamentState())
+        setTournamentState(latestState)
+      }
+
+      const currentDivisionState = normalizeCompetitionState(latestState.competitionDivisions?.[selectedDivision])
+      const currentStage = currentDivisionState.playoffStage
+
+      if (!['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final'].includes(currentStage)) {
+        setStatusMessage('Алга жылдыруу үчүн активдүү плей-офф этабы керек.')
+        return
+      }
+
+      if (currentStage === 'final') {
+        const final12Winner = resolvePlayoffWinner(currentDivisionState.bracket.final12)
+        const final34Winner = resolvePlayoffWinner(currentDivisionState.bracket.final34)
+
+        if (!final12Winner || !final34Winner) {
+          setStatusMessage('Финал менен 3-4 орун беттешинин упайларын толук киргизиңиз.')
+          return
+        }
+
+        const silver = final12Winner.id === currentDivisionState.bracket.final12.p1?.id
+          ? currentDivisionState.bracket.final12.p2
+          : currentDivisionState.bracket.final12.p1
+        const fourth = final34Winner.id === currentDivisionState.bracket.final34.p1?.id
+          ? currentDivisionState.bracket.final34.p2
+          : currentDivisionState.bracket.final34.p1
+        const savedState = await saveSelectedDivisionState(
+          latestState,
+          {
+            ...currentDivisionState,
+            bracket: {
+              ...currentDivisionState.bracket,
+              final12: {
+                ...currentDivisionState.bracket.final12,
+                winner: final12Winner,
+              },
+              final34: {
+                ...currentDivisionState.bracket.final34,
+                winner: final34Winner,
+              },
+              winners: [
+                { position: 1, player: final12Winner },
+                { position: 2, player: silver },
+                { position: 3, player: final34Winner },
+                { position: 4, player: fourth },
+              ],
+            },
+          },
+          'Финалдын жыйынтыгы сакталды.',
+        )
+        setTournamentState(savedState)
+        return
+      }
+
+      const currentMatches = Array.isArray(currentDivisionState.bracket?.[currentStage]) ? currentDivisionState.bracket[currentStage] : []
+      if (!currentMatches.length) {
+        setStatusMessage('Бул этапта беттештер табылган жок.')
+        return
+      }
+
+      const normalizedMatches = currentMatches.map((match) => finalizeStandardMatchForAdvance(match, resolvePlayoffWinner))
+      const winners = normalizedMatches.map((match) => resolvePlayoffWinner(match))
+      if (winners.some((winner) => !winner)) {
+        setStatusMessage('Адегенде бул этаптагы бардык упайларды толук киргизиңиз.')
+        return
+      }
+
+      if (currentStage === 'semiFinals') {
+        const losers = normalizedMatches.map((match) => (resolvePlayoffWinner(match)?.id === match.p1?.id ? match.p2 : match.p1))
+        const savedState = await saveSelectedDivisionState(
+          latestState,
+          {
+            ...currentDivisionState,
+            playoffStage: 'final',
+            bracket: {
+              ...currentDivisionState.bracket,
+              semiFinals: normalizedMatches,
+              final12: mergeMatchState(currentDivisionState.bracket.final12, createMatch('final12', winners[0], winners[1], true)),
+              final34: mergeMatchState(currentDivisionState.bracket.final34, createMatch('final34', losers[0], losers[1], true)),
+            },
+          },
+          'Финал ачылды.',
+        )
+        setTournamentState(savedState)
+        return
+      }
+
+      const nextStageKey = getNextStageKey(currentDivisionState.playoffMode, currentStage)
+      if (!nextStageKey) {
+        setStatusMessage('Кийинки этап табылган жок.')
+        return
+      }
+
+      const existingNextMatches = Array.isArray(currentDivisionState.bracket?.[nextStageKey]) ? currentDivisionState.bracket[nextStageKey] : []
+      const nextMatches = []
+      for (let index = 0; index < winners.length; index += 2) {
+        nextMatches.push(
+          mergeMatchState(
+            existingNextMatches[index / 2],
+            createMatch(`${nextStageKey}-${index}`, winners[index], winners[index + 1]),
+          ),
+        )
+      }
+
+      const savedState = await saveSelectedDivisionState(
+        latestState,
+        {
+          ...currentDivisionState,
+          playoffStage: nextStageKey,
+          bracket: {
+            ...currentDivisionState.bracket,
+            [currentStage]: normalizedMatches,
+            [nextStageKey]: nextMatches,
+          },
+        },
+        `${PLAYOFF_STAGE_TITLES[nextStageKey] || 'Кийинки этап'} ачылды.`,
+      )
+      setTournamentState(savedState)
+    } catch (error) {
+      setStatusMessage(error.message || 'Плей-оффту алдыга жылдыруу мүмкүн болгон жок.')
     } finally {
       setIsSaving(false)
     }
@@ -430,7 +953,7 @@ export default function AssistantPage({ onLogout }) {
 
     const submissions = []
 
-    if (activeCompetitionState.playoffStage === 'final') {
+    if (currentAssistantStage === 'final') {
       for (const match of [activeCompetitionState.bracket.final34, activeCompetitionState.bracket.final12].filter(Boolean)) {
         const currentRoundCount = match.id === 'final34' ? activeCompetitionState.playoffFinalRounds.final34 : activeCompetitionState.playoffFinalRounds.final12
         for (const player of [match.p1, match.p2].filter(Boolean)) {
@@ -438,17 +961,28 @@ export default function AssistantPage({ onLogout }) {
             const draftKey = getFinalScoreDraftKey(selectedDivision, match.id, player.id, roundIndex)
             const score = sanitizeScore(sourceDrafts[draftKey] || '')
             if (score === '') continue
-            submissions.push({ draftKey, payload: { playerId: player.id, score, roundIndex } })
+            submissions.push({ draftKey, payload: { playerId: player.id, score, roundIndex, divisionId: selectedDivision, stageKey: 'final' } })
+          }
+        }
+      }
+    } else if (currentAssistantStage === 'fifthPlace') {
+      for (const stageKey of FIFTH_PLACE_STAGE_KEYS) {
+        for (const match of getStageMatchesByKey(activeCompetitionState, stageKey)) {
+          for (const player of [match?.p1, match?.p2].filter(Boolean)) {
+            const draftKey = getStageScoreDraftKey(selectedDivision, stageKey, player.id)
+            const score = sanitizeScore(sourceDrafts[draftKey] || '')
+            if (score === '') continue
+            submissions.push({ draftKey, payload: { playerId: player.id, score, divisionId: selectedDivision, stageKey } })
           }
         }
       }
     } else {
-      for (const match of getStageMatches(activeCompetitionState)) {
+      for (const match of getStageMatchesByKey(activeCompetitionState, currentAssistantStage)) {
         for (const player of [match?.p1, match?.p2].filter(Boolean)) {
-          const draftKey = getStageScoreDraftKey(selectedDivision, activeCompetitionState.playoffStage, player.id)
+          const draftKey = getStageScoreDraftKey(selectedDivision, currentAssistantStage, player.id)
           const score = sanitizeScore(sourceDrafts[draftKey] || '')
           if (score === '') continue
-          submissions.push({ draftKey, payload: { playerId: player.id, score } })
+          submissions.push({ draftKey, payload: { playerId: player.id, score, divisionId: selectedDivision, stageKey: currentAssistantStage } })
         }
       }
     }
@@ -582,8 +1116,29 @@ export default function AssistantPage({ onLogout }) {
             ))}
           </div>
 
+          <div className="assistant-fifth-place-actions">
+            <button
+              type="button"
+              className="secondary-button secondary-button--auto"
+              onClick={handleOpenFifthPlace}
+              disabled={isSaving || (!canOpenFifthPlace && !hasFifthPlaceBracket)}
+            >
+              {hasFifthPlaceBracket ? 'Войти на 5-место' : '5-место'}
+            </button>
+            {isFifthPlaceView && (
+              <button
+                type="button"
+                className="secondary-button secondary-button--auto"
+                onClick={() => setAssistantView('main')}
+                disabled={isSaving}
+              >
+                Артка
+              </button>
+            )}
+          </div>
+
           <div className="assistant-stage-banner">
-            <strong>{stageLabel}</strong>
+            <strong>{currentAssistantStage === 'final' ? 'Финал' : PLAYOFF_STAGE_TITLES[currentAssistantStage] || 'Тандоо жок'}</strong>
             <span>Топ: {activeCompetitionState.playoffMode}</span>
             <span>Этап: {activeCompetitionState.playoffStage === 'none' ? 'Жок' : activeCompetitionState.playoffStage}</span>
           </div>
@@ -601,7 +1156,65 @@ export default function AssistantPage({ onLogout }) {
             <div className="pill">Админдеги сыяктуу сетка</div>
           </div>
 
-          {stageColumns.length > 0 ? (
+          {isFifthPlaceView ? (
+            fifthPlaceStages.length > 0 ? (
+              <div
+                className="bracket-grid"
+                style={{
+                  '--bracket-column-count': fifthPlaceStages.length + (fifthPlaceWinner ? 1 : 0),
+                  '--bracket-column-width': '280px',
+                  '--bracket-column-gap': '40px',
+                }}
+              >
+                {fifthPlaceStages.map((stage, index) => (
+                  <EditableStageColumn
+                    key={stage.id}
+                    divisionId={selectedDivision}
+                    stageKey={stage.id}
+                    title={stage.label}
+                    playoffMode={4}
+                    stageIndex={index}
+                    matches={stage.matches}
+                    isActive
+                    canEdit={activeCompetitionState.playoffStage === 'fifthPlace' && (stage.id === 'fifthPlaceFinal' || !activeCompetitionState.bracket.fifthPlaceFinal)}
+                    scoreDrafts={scoreDrafts}
+                    onDraftChange={setDraftForPlayer}
+                    onScoreSubmit={handleBatchSubmit}
+                    isSaving={isSaving}
+                    assistantEnabled={assistantEnabled}
+                  />
+                ))}
+
+                {fifthPlaceWinner && (
+                  <div className="stage-column stage-column--winner stage-column--winner-fifth">
+                    <div className="stage-column__header">
+                      <p className="stage-column__eyebrow">Жеңүүчү</p>
+                      <h4>5-место</h4>
+                    </div>
+
+                    <div className="stage-column__matches">
+                      <div className="bracket-match-slot bracket-match-slot--winner">
+                        <article className="playoff-card playoff-card--winner">
+                          <div className="playoff-row playoff-row--winner">
+                            <div className="playoff-row__identity">
+                              <span className="playoff-row__name">{fifthPlaceWinner.name}</span>
+                            </div>
+                            <div className="playoff-row__score">
+                              {activeCompetitionState.bracket.fifthPlaceFinal?.winner?.id === activeCompetitionState.bracket.fifthPlaceFinal?.p1?.id
+                                ? activeCompetitionState.bracket.fifthPlaceFinal?.s1
+                                : activeCompetitionState.bracket.fifthPlaceFinal?.s2}
+                            </div>
+                          </div>
+                        </article>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="empty-state">5-место азырынча ачыла элек.</div>
+            )
+          ) : stageColumns.length > 0 ? (
             <div
               className="bracket-grid"
               style={{
@@ -629,6 +1242,25 @@ export default function AssistantPage({ onLogout }) {
                 />
               ))}
 
+              {false && fifthPlaceStages.map((stage, index) => (
+                <EditableStageColumn
+                  key={stage.id}
+                  divisionId={selectedDivision}
+                  stageKey={stage.id}
+                  title={stage.label}
+                  playoffMode={4}
+                  stageIndex={index}
+                  matches={stage.matches}
+                  isActive={activeCompetitionState.playoffStage === 'fifthPlace'}
+                  canEdit={activeCompetitionState.playoffStage === 'fifthPlace' && (stage.id === 'fifthPlaceFinal' || !activeCompetitionState.bracket.fifthPlaceFinal)}
+                  scoreDrafts={scoreDrafts}
+                  onDraftChange={setDraftForPlayer}
+                  onScoreSubmit={handleBatchSubmit}
+                  isSaving={isSaving}
+                  assistantEnabled={assistantEnabled}
+                />
+              ))}
+
               {hasFinalMatches && (
                 <div className="stage-column stage-column--final">
                   <div className="stage-column__header">
@@ -636,103 +1268,105 @@ export default function AssistantPage({ onLogout }) {
                     <h4>Финал</h4>
                   </div>
 
-                  {activeCompetitionState.bracket.final12 && (
-                    <>
-                      <div className="mode-switch mode-switch--compact assistant-final-round-switch">
-                        <span className="pill">A{activeCompetitionState.playoffFinalRounds.final12}</span>
-                        {Array.from({ length: activeCompetitionState.playoffFinalRounds.final12 }, (_, index) => index + 1).map((round) => (
+                  <div className="stage-column__final-matches final-stack final-stack--assistant">
+                    {activeCompetitionState.bracket.final12 && (
+                      <div className="final-stack__item final-stack__item--front">
+                        <div className="mode-switch mode-switch--compact assistant-final-round-switch">
+                          <span className="pill">A{activeCompetitionState.playoffFinalRounds.final12}</span>
+                          {Array.from({ length: activeCompetitionState.playoffFinalRounds.final12 }, (_, index) => index + 1).map((round) => (
+                            <button
+                              key={`final12-round-${round}`}
+                              type="button"
+                              className={`mode-switch__button ${activeCompetitionState.playoffFinalRounds.final12 === round ? 'mode-switch__button--active' : ''}`}
+                              onClick={() => handleFinalRoundChange('final12', round)}
+                              disabled={isSaving}
+                            >
+                              A{round}
+                            </button>
+                          ))}
                           <button
-                            key={`final12-round-${round}`}
                             type="button"
-                            className={`mode-switch__button ${activeCompetitionState.playoffFinalRounds.final12 === round ? 'mode-switch__button--active' : ''}`}
-                            onClick={() => handleFinalRoundChange('final12', round)}
-                            disabled={isSaving}
+                            className="mode-switch__button mode-switch__button--plus"
+                            onClick={() => handleFinalRoundChange('final12', activeCompetitionState.playoffFinalRounds.final12 - 1)}
+                            disabled={activeCompetitionState.playoffFinalRounds.final12 <= 1 || isSaving}
+                            aria-label="Previous round"
                           >
-                            A{round}
+                            -
                           </button>
-                        ))}
-                        <button
-                          type="button"
-                          className="mode-switch__button mode-switch__button--plus"
-                          onClick={() => handleFinalRoundChange('final12', activeCompetitionState.playoffFinalRounds.final12 - 1)}
-                          disabled={activeCompetitionState.playoffFinalRounds.final12 <= 1 || isSaving}
-                          aria-label="Previous round"
-                        >
-                          -
-                        </button>
-                        <button
-                          type="button"
-                          className="mode-switch__button mode-switch__button--plus"
-                          onClick={() => handleFinalRoundChange('final12', activeCompetitionState.playoffFinalRounds.final12 + 1)}
-                          disabled={activeCompetitionState.playoffFinalRounds.final12 >= 6 || isSaving}
-                          aria-label="Next round"
-                        >
-                          +
-                        </button>
+                          <button
+                            type="button"
+                            className="mode-switch__button mode-switch__button--plus"
+                            onClick={() => handleFinalRoundChange('final12', activeCompetitionState.playoffFinalRounds.final12 + 1)}
+                            disabled={activeCompetitionState.playoffFinalRounds.final12 >= 6 || isSaving}
+                            aria-label="Next round"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <EditableMatch
+                          divisionId={selectedDivision}
+                          draftStageKey="final12"
+                          match={activeCompetitionState.bracket.final12}
+                          scoreDrafts={scoreDrafts}
+                          onDraftChange={setDraftForPlayer}
+                          onScoreSubmit={handleBatchSubmit}
+                          isSaving={isSaving}
+                          assistantEnabled={assistantEnabled}
+                          canEdit={activeCompetitionState.playoffStage === 'final'}
+                          activeRound={activeCompetitionState.playoffFinalRounds.final12}
+                        />
                       </div>
-                      <EditableMatch
-                        divisionId={selectedDivision}
-                        draftStageKey="final12"
-                        match={activeCompetitionState.bracket.final12}
-                        scoreDrafts={scoreDrafts}
-                        onDraftChange={setDraftForPlayer}
-                        onScoreSubmit={handleBatchSubmit}
-                        isSaving={isSaving}
-                        assistantEnabled={assistantEnabled}
-                        canEdit={activeCompetitionState.playoffStage === 'final'}
-                        activeRound={activeCompetitionState.playoffFinalRounds.final12}
-                      />
-                    </>
-                  )}
+                    )}
 
-                  {activeCompetitionState.bracket.final34 && (
-                    <>
-                      <div className="mode-switch mode-switch--compact assistant-final-round-switch">
-                        <span className="pill">A{activeCompetitionState.playoffFinalRounds.final34}</span>
-                        {Array.from({ length: activeCompetitionState.playoffFinalRounds.final34 }, (_, index) => index + 1).map((round) => (
+                    {activeCompetitionState.bracket.final34 && (
+                      <div className="final-stack__item final-stack__item--back">
+                        <div className="mode-switch mode-switch--compact assistant-final-round-switch">
+                          <span className="pill">A{activeCompetitionState.playoffFinalRounds.final34}</span>
+                          {Array.from({ length: activeCompetitionState.playoffFinalRounds.final34 }, (_, index) => index + 1).map((round) => (
+                            <button
+                              key={`final34-round-${round}`}
+                              type="button"
+                              className={`mode-switch__button ${activeCompetitionState.playoffFinalRounds.final34 === round ? 'mode-switch__button--active' : ''}`}
+                              onClick={() => handleFinalRoundChange('final34', round)}
+                              disabled={isSaving}
+                            >
+                              A{round}
+                            </button>
+                          ))}
                           <button
-                            key={`final34-round-${round}`}
                             type="button"
-                            className={`mode-switch__button ${activeCompetitionState.playoffFinalRounds.final34 === round ? 'mode-switch__button--active' : ''}`}
-                            onClick={() => handleFinalRoundChange('final34', round)}
-                            disabled={isSaving}
+                            className="mode-switch__button mode-switch__button--plus"
+                            onClick={() => handleFinalRoundChange('final34', activeCompetitionState.playoffFinalRounds.final34 - 1)}
+                            disabled={activeCompetitionState.playoffFinalRounds.final34 <= 1 || isSaving}
+                            aria-label="Previous round 3-4"
                           >
-                            A{round}
+                            -
                           </button>
-                        ))}
-                        <button
-                          type="button"
-                          className="mode-switch__button mode-switch__button--plus"
-                          onClick={() => handleFinalRoundChange('final34', activeCompetitionState.playoffFinalRounds.final34 - 1)}
-                          disabled={activeCompetitionState.playoffFinalRounds.final34 <= 1 || isSaving}
-                          aria-label="Previous round 3-4"
-                        >
-                          -
-                        </button>
-                        <button
-                          type="button"
-                          className="mode-switch__button mode-switch__button--plus"
-                          onClick={() => handleFinalRoundChange('final34', activeCompetitionState.playoffFinalRounds.final34 + 1)}
-                          disabled={activeCompetitionState.playoffFinalRounds.final34 >= 6 || isSaving}
-                          aria-label="Next round 3-4"
-                        >
-                          +
-                        </button>
+                          <button
+                            type="button"
+                            className="mode-switch__button mode-switch__button--plus"
+                            onClick={() => handleFinalRoundChange('final34', activeCompetitionState.playoffFinalRounds.final34 + 1)}
+                            disabled={activeCompetitionState.playoffFinalRounds.final34 >= 6 || isSaving}
+                            aria-label="Next round 3-4"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <EditableMatch
+                          divisionId={selectedDivision}
+                          draftStageKey="final34"
+                          match={activeCompetitionState.bracket.final34}
+                          scoreDrafts={scoreDrafts}
+                          onDraftChange={setDraftForPlayer}
+                          onScoreSubmit={handleBatchSubmit}
+                          isSaving={isSaving}
+                          assistantEnabled={assistantEnabled}
+                          canEdit={activeCompetitionState.playoffStage === 'final'}
+                          activeRound={activeCompetitionState.playoffFinalRounds.final34}
+                        />
                       </div>
-                      <EditableMatch
-                        divisionId={selectedDivision}
-                        draftStageKey="final34"
-                        match={activeCompetitionState.bracket.final34}
-                        scoreDrafts={scoreDrafts}
-                        onDraftChange={setDraftForPlayer}
-                        onScoreSubmit={handleBatchSubmit}
-                        isSaving={isSaving}
-                        assistantEnabled={assistantEnabled}
-                        canEdit={activeCompetitionState.playoffStage === 'final'}
-                        activeRound={activeCompetitionState.playoffFinalRounds.final34}
-                      />
-                    </>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -756,6 +1390,41 @@ export default function AssistantPage({ onLogout }) {
               disabled={!assistantEnabled || isSaving || !hasPendingDrafts}
             >
               Отправить в админ панель
+            </button>
+            {isFifthPlaceView && fifthPlaceWinner && !fifthPlaceSavedToReport && (
+              <button
+                type="button"
+                className="primary-button assistant-forward-button"
+                onClick={handleSendFifthPlaceToReport}
+                disabled={!assistantEnabled || isSaving}
+              >
+                Отправить в отчёт
+              </button>
+            )}
+            <button
+              type="button"
+              className="primary-button assistant-forward-button"
+              style={{
+                display:
+                  (isFifthPlaceView && !(fifthPlaceWinner && !fifthPlaceSavedToReport)) ||
+                  ['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final'].includes(activeCompetitionState.playoffStage)
+                    ? 'inline-flex'
+                    : 'none',
+              }}
+              onClick={
+                isFifthPlaceView
+                  ? (fifthPlaceWinner && !fifthPlaceSavedToReport ? handleSendFifthPlaceToReport : handleFifthPlaceForward)
+                  : handlePlayoffForward
+              }
+              disabled={
+                !assistantEnabled ||
+                isSaving ||
+                (isFifthPlaceView
+                  ? activeCompetitionState.playoffStage !== 'fifthPlace' || !hasFifthPlaceBracket
+                  : !['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final'].includes(activeCompetitionState.playoffStage))
+              }
+            >
+              Вперёд
             </button>
           </div>
         </section>
@@ -781,7 +1450,7 @@ const EditableStageColumn = ({
 }) => {
   const roundIndex = getRoundIndex(playoffMode, stageKey)
   const roundFactor = 2 ** Math.max(roundIndex, 0)
-  const slotCount = getStageMatchCount(playoffMode, stageKey)
+  const slotCount = stageKey === 'fifthPlaceSemiFinals' || stageKey === 'fifthPlaceFinal' ? matches.length : getStageMatchCount(playoffMode, stageKey)
   const slotStageClassName = `bracket-match-slot--${stageKey}`
   const connectorStageClassName = `bracket-match-slot__connector--${stageKey}`
   const editableConnectorClassName =

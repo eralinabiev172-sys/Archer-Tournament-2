@@ -1004,6 +1004,8 @@ body,
 
 .stage-column--final {
   gap: 16px;
+  width: calc((var(--bracket-column-width) * 2) + 18px);
+  max-width: calc(100vw - 48px);
 }
 
 .stage-column__final-matches {
@@ -1371,6 +1373,46 @@ body,
   background: rgba(248, 250, 252, 0.75);
 }
 
+.final-stack {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, var(--bracket-column-width)));
+  gap: 18px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  isolation: isolate;
+}
+
+.final-stack__item {
+  min-width: 0;
+}
+
+.final-stack__item--front {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  z-index: 2;
+}
+
+.final-stack__item--back {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  z-index: 1;
+  transform: none;
+  opacity: 1;
+}
+
+.final-stack__item--back .match-card {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+}
+
+.final-stack__item:only-child {
+  grid-column: 1 / -1;
+  max-width: var(--bracket-column-width);
+}
+
 .app-background {
   background: var(--theme-background);
 }
@@ -1727,15 +1769,13 @@ body,
 
 @media (max-width: 1100px) {
   .stage-column--final {
-    width: min(100%, 320px);
+    width: calc((var(--bracket-column-width) * 2) + 14px);
+    max-width: calc(100vw - 36px);
     justify-self: end;
     margin-left: auto;
   }
 
   .stage-column__final-matches {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 14px;
     align-items: start;
     min-width: 0;
     width: 100%;
@@ -1744,6 +1784,16 @@ body,
   .match-card--final {
     width: 100%;
     min-width: 0;
+  }
+
+  .final-stack {
+    grid-template-columns: repeat(2, minmax(210px, var(--bracket-column-width)));
+    gap: 14px;
+    padding: 0;
+  }
+
+  .final-stack__item--back {
+    transform: none;
   }
 }
 
@@ -1990,6 +2040,17 @@ body,
   .match-card--final {
     padding: 12px;
     gap: 12px;
+  }
+
+  .final-stack {
+    grid-template-columns: repeat(2, minmax(190px, var(--bracket-column-width)));
+    gap: 12px;
+    padding: 0;
+  }
+
+  .final-stack__item--back {
+    transform: none;
+    opacity: 1;
   }
 
   .final-rounds {

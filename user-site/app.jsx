@@ -9,6 +9,8 @@ const EMPTY_BRACKET = {
   roundOf16: [],
   quarterFinals: [],
   semiFinals: [],
+  fifthPlaceSemiFinals: [],
+  fifthPlaceFinal: null,
   final12: null,
   final34: null,
   winners: [],
@@ -274,7 +276,7 @@ const parseTournamentState = (payload) => {
 
   const normalizeCompetitionState = (value) => ({
     playoffMode: [32, 16, 8, 4].includes(Number(value?.playoffMode)) ? Number(value.playoffMode) : 16,
-    playoffStage: ['none', 'roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final'].includes(value?.playoffStage)
+    playoffStage: ['none', 'roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final', 'fifthPlace'].includes(value?.playoffStage)
       ? value.playoffStage
       : 'none',
     playoffFinalRounds: normalizePlayoffFinalRounds(value?.playoffFinalRounds),
@@ -365,6 +367,11 @@ const getPlayerPlayoffMatch = (bracket, playoffStage, playerId) => {
   if (playoffStage === 'final') {
     const finals = [bracket.final12, bracket.final34].filter(Boolean)
     return finals.find((match) => match?.p1?.id === playerId || match?.p2?.id === playerId) || null
+  }
+
+  if (playoffStage === 'fifthPlace') {
+    const fifthPlaceMatches = bracket.fifthPlaceFinal ? [bracket.fifthPlaceFinal] : (bracket.fifthPlaceSemiFinals || [])
+    return fifthPlaceMatches.find((match) => match?.p1?.id === playerId || match?.p2?.id === playerId) || null
   }
 
   const stageMatches = Array.isArray(bracket?.[playoffStage]) ? bracket[playoffStage] : []
@@ -991,9 +998,10 @@ function App() {
         await submitPlayoffPlayerScore({
           playerId: selectedPlayer.id,
           score: playoffScoreForm.score,
+          divisionId: playerCompetitionDivision,
         }),
       )
-      const nextDivisionId = selectedPlayer.gender === 'female' ? 'female' : 'male'
+      const nextDivisionId = playerCompetitionDivision
       const nextCompetitionState = nextState.competitionDivisions?.[nextDivisionId] || createEmptyCompetitionState()
       const refreshedMatch = getPlayerPlayoffMatch(nextCompetitionState.bracket, nextCompetitionState.playoffStage, selectedPlayer.id)
       const replayRequired = isStandardPlayoffReplayRequired(refreshedMatch)
@@ -1474,15 +1482,19 @@ function App() {
                       <h4>Финал</h4>
                     </div>
 
-                    <div className="stage-column__final-matches">
+                    <div className="stage-column__final-matches final-stack">
                       {activeCompetitionState.bracket.final12 && (
-                        <ReadOnlyMatch match={activeCompetitionState.bracket.final12} isFinal />
+                        <div className="final-stack__item final-stack__item--front">
+                          <ReadOnlyMatch match={activeCompetitionState.bracket.final12} isFinal />
+                        </div>
                       )}
                       {activeCompetitionState.bracket.final34 && (
-                        <ReadOnlyMatch
-                          match={activeCompetitionState.bracket.final34}
-                          isFinal
-                        />
+                        <div className="final-stack__item final-stack__item--back">
+                          <ReadOnlyMatch
+                            match={activeCompetitionState.bracket.final34}
+                            isFinal
+                          />
+                        </div>
                       )}
                     </div>
                   </div>
