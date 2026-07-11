@@ -20,6 +20,8 @@ const PLAYOFF_DIVISION_META_KEY = '__playoffDivision'
 const PLAYOFF_FINAL_ROUNDS_META_KEY = '__playoffFinalRounds'
 const COMPETITION_DIVISIONS_META_KEY = '__competitionDivisions'
 const PASSWORD_PROTECTION_META_KEY = '__passwordProtectionEnabled'
+const STATE_VERSION_META_KEY = '__stateVersion'
+const STATE_UPDATED_AT_META_KEY = '__stateUpdatedAt'
 const DEFAULT_PASSWORD_PROTECTION_ENABLED = false
 
 function createEmptyBracket() {
@@ -135,6 +137,8 @@ const extractPlayerNumberBook = (value) => {
   delete nextBook[PLAYOFF_FINAL_ROUNDS_META_KEY]
   delete nextBook[COMPETITION_DIVISIONS_META_KEY]
   delete nextBook[PASSWORD_PROTECTION_META_KEY]
+  delete nextBook[STATE_VERSION_META_KEY]
+  delete nextBook[STATE_UPDATED_AT_META_KEY]
   return nextBook
 }
 
@@ -158,6 +162,16 @@ const readStoredCompetitionDivisions = (dbRow) =>
 const readStoredPasswordProtectionEnabled = (dbRow) =>
   normalizePasswordProtectionEnabled(dbRow.player_number_book?.[PASSWORD_PROTECTION_META_KEY])
 
+const readStoredStateVersion = (dbRow) => {
+  const value = Number(dbRow.player_number_book?.[STATE_VERSION_META_KEY])
+  return Number.isInteger(value) && value >= 0 ? value : 0
+}
+
+const readStoredStateUpdatedAt = (dbRow) => {
+  const value = dbRow.player_number_book?.[STATE_UPDATED_AT_META_KEY]
+  return typeof value === 'string' || value === null ? value : null
+}
+
 const writeStoredPlayerNumberBook = (
   playerNumberBook,
   scoreSubmission,
@@ -165,6 +179,8 @@ const writeStoredPlayerNumberBook = (
   playoffFinalRounds,
   competitionDivisions,
   passwordProtectionEnabled,
+  version,
+  updatedAt,
 ) => ({
   ...(playerNumberBook || {}),
   [SCORE_SUBMISSION_META_KEY]: normalizeScoreSubmission(scoreSubmission),
@@ -172,6 +188,8 @@ const writeStoredPlayerNumberBook = (
   [PLAYOFF_FINAL_ROUNDS_META_KEY]: normalizePlayoffFinalRounds(playoffFinalRounds),
   [COMPETITION_DIVISIONS_META_KEY]: normalizeCompetitionDivisions(competitionDivisions),
   [PASSWORD_PROTECTION_META_KEY]: normalizePasswordProtectionEnabled(passwordProtectionEnabled),
+  [STATE_VERSION_META_KEY]: Number.isInteger(version) && version >= 0 ? version : 0,
+  [STATE_UPDATED_AT_META_KEY]: typeof updatedAt === 'string' || updatedAt === null ? updatedAt : null,
 })
 
 const dbToJs = (dbRow) => {
@@ -195,6 +213,8 @@ const dbToJs = (dbRow) => {
     playoffMode: legacyDivisionState.playoffMode,
     competitionDivisions,
     passwordProtectionEnabled: readStoredPasswordProtectionEnabled(dbRow),
+    version: readStoredStateVersion(dbRow),
+    updatedAt: readStoredStateUpdatedAt(dbRow),
     playerNumberBook: extractPlayerNumberBook(dbRow.player_number_book),
     scoreSubmission: readStoredScoreSubmission(dbRow),
   }
@@ -215,6 +235,8 @@ const jsToDb = (jsState) => {
       legacyDivisionState.playoffFinalRounds,
       competitionDivisions,
       jsState.passwordProtectionEnabled,
+      jsState.version,
+      jsState.updatedAt,
     ),
   }
 }
@@ -292,6 +314,8 @@ export default async function handler(req, res) {
 
     const nextState = {
       ...currentState,
+      version: currentState.version + 1,
+      updatedAt: new Date().toISOString(),
       players: [...currentState.players, newPlayer],
       playerNumberBook: {
         ...(currentState.playerNumberBook || {}),

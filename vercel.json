@@ -22,6 +22,14 @@
       "dest": "/api/playoff-player-score.js"
     },
     {
+      "src": "/admin/?",
+      "dest": "/admin/index.html"
+    },
+    {
+      "src": "/assistant/?",
+      "dest": "/assistant/index.html"
+    },
+    {
       "handle": "filesystem"
     },
     {

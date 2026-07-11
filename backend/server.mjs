@@ -16,6 +16,7 @@ const EMPTY_BRACKET = {
   semiFinals: [],
   fifthPlaceSemiFinals: [],
   fifthPlaceFinal: null,
+  fifthPlaceSentToReport: false,
   final12: null,
   final34: null,
   winners: [],
@@ -49,6 +50,8 @@ const DEFAULT_STATE = {
   },
   passwordProtectionEnabled: false,
   assistantScoringEnabled: false,
+  version: 0,
+  updatedAt: null,
 }
 
 const normalizePlayerName = (name) => name.trim().toLocaleLowerCase()
@@ -104,17 +107,32 @@ const readState = async () => {
       scoreSubmission: normalizeScoreSubmission(parsed.scoreSubmission),
       passwordProtectionEnabled: normalizePasswordProtectionEnabled(parsed.passwordProtectionEnabled),
       assistantScoringEnabled: normalizeAssistantScoringEnabled(parsed.assistantScoringEnabled),
+      version: Number.isInteger(parsed.version) && parsed.version >= 0 ? parsed.version : 0,
+      updatedAt: typeof parsed.updatedAt === 'string' || parsed.updatedAt === null ? parsed.updatedAt : null,
     }
   } catch {
     return { ...DEFAULT_STATE }
   }
 }
 
-const writeState = async (state) => {
+const writeState = async (state, previousState = null) => {
   await ensureStorage()
-  writeQueue = writeQueue.then(() => writeFile(dataFile, JSON.stringify(state, null, 2), 'utf8'))
+  const baseState = previousState || DEFAULT_STATE
+  const nextState = {
+    ...state,
+    version: (Number.isInteger(baseState.version) ? baseState.version : 0) + 1,
+    updatedAt: new Date().toISOString(),
+  }
+  writeQueue = writeQueue.then(() => writeFile(dataFile, JSON.stringify(nextState, null, 2), 'utf8'))
   await writeQueue
-  return state
+  return nextState
+}
+
+const createHttpError = (statusCode, message, extra = {}) => {
+  const error = new Error(message)
+  error.statusCode = statusCode
+  Object.assign(error, extra)
+  return error
 }
 
 const sendJson = (response, statusCode, payload) => {
@@ -298,6 +316,115 @@ const shouldUseShootOffForStandardMatch = (match) =>
       ((match.submittedP1 && match.submittedP2) || Number(match.s1) !== 0 || Number(match.s2) !== 0),
   )
 
+const samePlayer = (left, right) => Boolean(left?.id && right?.id && left.id === right.id)
+const sameMatchParticipants = (left, right) =>
+  samePlayer(left?.p1, right?.p1) && samePlayer(left?.p2, right?.p2) && Boolean(left?.isFinal) === Boolean(right?.isFinal)
+
+const mergeMatchState = (existingMatch, nextMatch) => {
+  if (!existingMatch || !sameMatchParticipants(existingMatch, nextMatch)) {
+    return nextMatch
+  }
+
+  return {
+    ...nextMatch,
+    s1: existingMatch.s1,
+    s2: existingMatch.s2,
+    shootOffS1: existingMatch.shootOffS1,
+    shootOffS2: existingMatch.shootOffS2,
+    s1_bot: existingMatch.s1_bot,
+    s2_bot: existingMatch.s2_bot,
+    winner: existingMatch.winner,
+    roundsP1: Array.isArray(existingMatch.roundsP1) ? [...existingMatch.roundsP1] : [...nextMatch.roundsP1],
+    roundsP2: Array.isArray(existingMatch.roundsP2) ? [...existingMatch.roundsP2] : [...nextMatch.roundsP2],
+    submittedRoundsP1: Array.isArray(existingMatch.submittedRoundsP1) ? [...existingMatch.submittedRoundsP1] : [...nextMatch.submittedRoundsP1],
+    submittedRoundsP2: Array.isArray(existingMatch.submittedRoundsP2) ? [...existingMatch.submittedRoundsP2] : [...nextMatch.submittedRoundsP2],
+    submittedP1: Boolean(existingMatch.submittedP1),
+    submittedP2: Boolean(existingMatch.submittedP2),
+    submittedShootOffP1: Boolean(existingMatch.submittedShootOffP1),
+    submittedShootOffP2: Boolean(existingMatch.submittedShootOffP2),
+  }
+}
+
+const syncFifthPlaceBracket = (bracket) => {
+  const nextBracket = { ...EMPTY_BRACKET, ...bracket }
+  const removeFifthPlaceFromReport = () => {
+    nextBracket.fifthPlaceSentToReport = false
+    nextBracket.winners = (nextBracket.winners || []).filter((entry) => entry.position !== 5)
+  }
+
+  const quarterFinalLosers = (nextBracket.quarterFinals || [])
+    .map((match) => {
+      const winner = resolvePlayoffWinner(match)
+      if (!winner) return null
+      return winner.id === match.p1?.id ? match.p2 : match.p1
+    })
+    .filter(Boolean)
+
+  if (quarterFinalLosers.length === 4) {
+    const existingSemiFinals = Array.isArray(nextBracket.fifthPlaceSemiFinals) ? nextBracket.fifthPlaceSemiFinals : []
+    const rebuiltSemiFinals = [
+      mergeMatchState(existingSemiFinals[0], createMatch('fifthPlaceSemiFinals-0', quarterFinalLosers[0], quarterFinalLosers[1])),
+      mergeMatchState(existingSemiFinals[1], createMatch('fifthPlaceSemiFinals-1', quarterFinalLosers[2], quarterFinalLosers[3])),
+    ].map((match) => ({
+      ...match,
+      winner: resolvePlayoffWinner(match),
+    }))
+
+    const semiFinalsChanged =
+      existingSemiFinals.length !== rebuiltSemiFinals.length ||
+      rebuiltSemiFinals.some((match, index) => !sameMatchParticipants(existingSemiFinals[index], match))
+
+    nextBracket.fifthPlaceSemiFinals = rebuiltSemiFinals
+
+    const semiFinalWinners = rebuiltSemiFinals.map((match) => match.winner).filter(Boolean)
+    if (semiFinalWinners.length === 2) {
+      const existingFinal = nextBracket.fifthPlaceFinal
+      const rebuiltFinal = mergeMatchState(existingFinal, createMatch('fifthPlaceFinal', semiFinalWinners[0], semiFinalWinners[1]))
+      const finalChanged = !sameMatchParticipants(existingFinal, rebuiltFinal)
+      nextBracket.fifthPlaceFinal = {
+        ...rebuiltFinal,
+        winner: resolvePlayoffWinner(rebuiltFinal),
+      }
+
+      if (semiFinalsChanged || finalChanged) {
+        removeFifthPlaceFromReport()
+      }
+    } else {
+      nextBracket.fifthPlaceFinal = null
+      removeFifthPlaceFromReport()
+    }
+  } else {
+    nextBracket.fifthPlaceSemiFinals = []
+    nextBracket.fifthPlaceFinal = null
+    removeFifthPlaceFromReport()
+  }
+
+  if (nextBracket.fifthPlaceSentToReport && nextBracket.fifthPlaceFinal?.winner) {
+    nextBracket.winners = [
+      ...(nextBracket.winners || []).filter((entry) => entry.position !== 5),
+      { position: 5, player: nextBracket.fifthPlaceFinal.winner },
+    ].sort((left, right) => left.position - right.position)
+  } else {
+    removeFifthPlaceFromReport()
+  }
+
+  return nextBracket
+}
+
+const syncCompetitionDivisionsFifthPlace = (competitionDivisions, legacyState = {}) => {
+  const normalizedDivisions = normalizeCompetitionDivisions(competitionDivisions, legacyState)
+
+  return Object.fromEntries(
+    Object.entries(normalizedDivisions).map(([divisionId, divisionState]) => [
+      divisionId,
+      {
+        ...divisionState,
+        bracket: syncFifthPlaceBracket(divisionState.bracket),
+      },
+    ]),
+  )
+}
+
 const registerPlayer = async (payload) => {
   const currentState = await readState()
   const name = sanitizePlayerName(payload.name)
@@ -353,8 +480,7 @@ const registerPlayer = async (payload) => {
     },
   }
 
-  await writeState(nextState)
-  return nextState
+  return writeState(nextState, currentState)
 }
 
 const submitPlayerScore = async (payload) => {
@@ -422,8 +548,7 @@ const submitPlayerScore = async (payload) => {
     },
   }
 
-  await writeState(nextState)
-  return nextState
+  return writeState(nextState, currentState)
 }
 
 const submitPlayoffPlayerScore = async (payload) => {
@@ -436,7 +561,7 @@ const submitPlayoffPlayerScore = async (payload) => {
   const assistantScoringEnabled = normalizeAssistantScoringEnabled(currentState.assistantScoringEnabled)
 
   if (!playerId) {
-    throw new Error('РћСЋРЅС‡Сѓ С‚Р°РЅРґР°Р»РіР°РЅ Р¶РѕРє.')
+    throw new Error('Оюнчу тандалган жок.')
   }
 
   if (passwordProtectionEnabled && (!password || !isValidPassword(password))) {
@@ -444,12 +569,12 @@ const submitPlayoffPlayerScore = async (payload) => {
   }
 
   if (!isScoreInputDigitsOnly(rawScore) || !isValidScoreValue(score)) {
-    throw new Error(`РЈРїР°Р№ 0РґРѕРЅ ${MAX_PLAYER_SCORE}РіР° С‡РµР№РёРЅРєРё СЃР°РЅ Р±РѕР»СѓС€Сѓ РєРµСЂРµРє.`)
+    throw new Error(`Упай 0дон ${MAX_PLAYER_SCORE}га чейинки сан болушу керек.`)
   }
 
   const player = currentState.players.find((item) => item.id === playerId)
   if (!player) {
-    throw new Error('РћСЋРЅС‡Сѓ С‚Р°Р±С‹Р»РіР°РЅ Р¶РѕРє.')
+    throw new Error('Оюнчу табылган жок.')
   }
 
   if (passwordProtectionEnabled && sanitizePassword(player.password) !== password) {
@@ -483,6 +608,7 @@ const submitPlayoffPlayerScore = async (payload) => {
     submittedShootOffP1: Boolean(activeMatch.submittedShootOffP1),
     submittedShootOffP2: Boolean(activeMatch.submittedShootOffP2),
   }
+  const allowAssistantOverwrite = payload.source === 'assistant'
 
   if (divisionState.playoffStage === 'final') {
     const finalStageKey = activeMatch.id === 'final34' ? 'final34' : 'final12'
@@ -490,7 +616,7 @@ const submitPlayoffPlayerScore = async (payload) => {
     const submittedRoundsKey = isPlayerOne ? 'submittedRoundsP1' : 'submittedRoundsP2'
     const roundsKey = isPlayerOne ? 'roundsP1' : 'roundsP2'
 
-    if (updatedMatch[submittedRoundsKey][activeRound - 1]) {
+    if (updatedMatch[submittedRoundsKey][activeRound - 1] && !allowAssistantOverwrite) {
       throw new Error('Бул финал айлампасы үчүн упай мурунтан эле жөнөтүлгөн.')
     }
 
@@ -523,6 +649,14 @@ const submitPlayoffPlayerScore = async (payload) => {
     updatedMatch.s1_bot = updatedMatch.roundsP1.slice(6).reduce((sum, item) => sum + Number(item || 0), 0)
     updatedMatch.s2_bot = updatedMatch.roundsP2.slice(6).reduce((sum, item) => sum + Number(item || 0), 0)
   } else {
+    if (allowAssistantOverwrite) {
+      updatedMatch[isPlayerOne ? 's1' : 's2'] = score
+      updatedMatch[isPlayerOne ? 'submittedP1' : 'submittedP2'] = true
+      updatedMatch.shootOffS1 = 0
+      updatedMatch.shootOffS2 = 0
+      updatedMatch.submittedShootOffP1 = false
+      updatedMatch.submittedShootOffP2 = false
+    } else {
     const useShootOff = shouldUseShootOffForStandardMatch(updatedMatch)
     const submissionKey = useShootOff
       ? isPlayerOne ? 'submittedShootOffP1' : 'submittedShootOffP2'
@@ -537,6 +671,7 @@ const submitPlayoffPlayerScore = async (payload) => {
       updatedMatch[isPlayerOne ? 's1' : 's2'] = score
     }
     updatedMatch[submissionKey] = true
+    }
   }
 
   updatedMatch.winner = resolvePlayoffWinner(updatedMatch)
@@ -556,24 +691,13 @@ const submitPlayoffPlayerScore = async (payload) => {
       nextBracket.fifthPlaceSemiFinals = (nextBracket.fifthPlaceSemiFinals || []).map((match) =>
         match.id === updatedMatch.id ? updatedMatch : match,
       )
-      const fifthPlaceWinners = (nextBracket.fifthPlaceSemiFinals || []).map((match) => resolvePlayoffWinner(match))
-      if (fifthPlaceWinners.length === 2 && fifthPlaceWinners.every(Boolean)) {
-        const existingFinal = nextBracket.fifthPlaceFinal
-        nextBracket.fifthPlaceFinal =
-          existingFinal?.p1?.id === fifthPlaceWinners[0].id && existingFinal?.p2?.id === fifthPlaceWinners[1].id
-            ? existingFinal
-            : createMatch('fifthPlaceFinal', fifthPlaceWinners[0], fifthPlaceWinners[1])
-      }
     }
-
-    if (nextBracket.fifthPlaceFinal) {
-      nextBracket.fifthPlaceFinal.winner = resolvePlayoffWinner(nextBracket.fifthPlaceFinal)
-    }
-
+    Object.assign(nextBracket, syncFifthPlaceBracket(nextBracket))
   } else {
     nextBracket[divisionState.playoffStage] = (nextBracket[divisionState.playoffStage] || []).map((match) =>
       match.id === updatedMatch.id ? updatedMatch : match,
     )
+    Object.assign(nextBracket, syncFifthPlaceBracket(nextBracket))
   }
 
   const nextState = {
@@ -587,8 +711,7 @@ const submitPlayoffPlayerScore = async (payload) => {
     },
   }
 
-  await writeState(nextState)
-  return nextState
+  return writeState(nextState, currentState)
 }
 
 const server = createServer(async (request, response) => {
@@ -612,20 +735,30 @@ const server = createServer(async (request, response) => {
 
     if (request.method === 'PUT' && url.pathname === '/api/state') {
       const body = await readBody(request)
+      const currentState = await readState()
+      if (Number.isInteger(body.version) && body.version !== currentState.version) {
+        throw createHttpError(409, 'Tournament state was updated in another session. Reload the latest data and try again.', {
+          currentState,
+          currentVersion: currentState.version,
+        })
+      }
+      const syncedCompetitionDivisions = syncCompetitionDivisionsFifthPlace(body.competitionDivisions, body)
       const nextState = {
         ...DEFAULT_STATE,
         ...body,
         playoffDivision: normalizePlayoffDivision(body.playoffDivision),
-        competitionDivisions: normalizeCompetitionDivisions(body.competitionDivisions, body),
+        competitionDivisions: syncedCompetitionDivisions,
         players: Array.isArray(body.players) ? body.players : [],
         scores: body.scores || {},
         playerNumberBook: body.playerNumberBook || {},
         scoreSubmission: normalizeScoreSubmission(body.scoreSubmission),
         passwordProtectionEnabled: normalizePasswordProtectionEnabled(body.passwordProtectionEnabled),
         assistantScoringEnabled: normalizeAssistantScoringEnabled(body.assistantScoringEnabled),
+        version: currentState.version,
+        updatedAt: currentState.updatedAt,
       }
-      await writeState(nextState)
-      sendJson(response, 200, nextState)
+      const savedState = await writeState(nextState, currentState)
+      sendJson(response, 200, savedState)
       return
     }
 
@@ -649,7 +782,11 @@ const server = createServer(async (request, response) => {
 
     sendJson(response, 404, { error: 'Not found' })
   } catch (error) {
-    sendJson(response, 400, { error: error.message || 'Unknown error' })
+    sendJson(response, Number.isInteger(error?.statusCode) ? error.statusCode : 400, {
+      error: error.message || 'Unknown error',
+      ...(error?.currentState ? { currentState: error.currentState } : {}),
+      ...(Number.isInteger(error?.currentVersion) ? { currentVersion: error.currentVersion } : {}),
+    })
   }
 })
 

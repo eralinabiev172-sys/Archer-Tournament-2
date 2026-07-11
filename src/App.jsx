@@ -123,6 +123,8 @@ const DEFAULT_STATE = {
   scoreSubmission: DEFAULT_SCORE_SUBMISSION,
   passwordProtectionEnabled: DEFAULT_PASSWORD_PROTECTION_ENABLED,
   assistantScoringEnabled: DEFAULT_ASSISTANT_SCORING_ENABLED,
+  version: 0,
+  updatedAt: null,
 };
 
 const seedOrders = {
@@ -442,6 +444,8 @@ const parseStoredState = (raw) => {
       ...(parsed.scoreSubmission || {}),
       entries: Array.isArray(parsed.scoreSubmission?.entries) ? parsed.scoreSubmission.entries : [],
     },
+    version: Number.isInteger(parsed.version) && parsed.version >= 0 ? parsed.version : 0,
+    updatedAt: typeof parsed.updatedAt === 'string' || parsed.updatedAt === null ? parsed.updatedAt : null,
   };
 };
 
@@ -776,6 +780,8 @@ const App = ({ onLogout }) => {
   const skipNextRemoteSaveRef = useRef(false);
   const preserveLocalChangesUntilRef = useRef(0);
   const lastLocalMutationAtRef = useRef(0);
+  const stateVersionRef = useRef(initialState.version ?? 0);
+  const stateUpdatedAtRef = useRef(initialState.updatedAt ?? null);
   const reportDate = new Date().toLocaleDateString('ru-RU');
 
   const markLocalMutation = (durationMs = 15000) => {
@@ -785,6 +791,8 @@ const App = ({ onLogout }) => {
   };
 
   const applyTournamentState = (nextState) => {
+    stateVersionRef.current = Number.isInteger(nextState.version) ? nextState.version : 0;
+    stateUpdatedAtRef.current = typeof nextState.updatedAt === 'string' || nextState.updatedAt === null ? nextState.updatedAt : null;
     setTournamentName(nextState.tournamentName);
     setLocation(nextState.location);
     setCategory(nextState.category);
@@ -817,6 +825,8 @@ const App = ({ onLogout }) => {
       competitionDivisions,
       passwordProtectionEnabled,
       assistantScoringEnabled,
+      version: stateVersionRef.current,
+      updatedAt: stateUpdatedAtRef.current,
       rounds: ROUNDS,
     };
 
@@ -860,7 +870,9 @@ const App = ({ onLogout }) => {
     const saveStartedAt = getTimestamp();
     preserveLocalChangesUntilRef.current = saveStartedAt + 15000;
     saveTournamentState(nextState)
-      .then(() => {
+      .then((savedState) => {
+        stateVersionRef.current = Number.isInteger(savedState?.version) ? savedState.version : stateVersionRef.current;
+        stateUpdatedAtRef.current = savedState?.updatedAt ?? stateUpdatedAtRef.current;
         setApiNotice('');
         if (lastLocalMutationAtRef.current <= saveStartedAt) {
           preserveLocalChangesUntilRef.current = getTimestamp() + 1000;
@@ -869,6 +881,14 @@ const App = ({ onLogout }) => {
       .catch((error) => {
         if (error?.code === 'API_UNAVAILABLE') {
           setApiNotice(error.message);
+          return;
+        }
+
+        if (error?.code === 'STATE_CONFLICT' && error.currentState) {
+          skipNextRemoteSaveRef.current = true;
+          applyTournamentState(parseStoredState(JSON.stringify(error.currentState)));
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(error.currentState));
+          setApiNotice('Башка терезеде жаңы өзгөртүү сакталды. Бул бет акыркы абал менен жаңыртылды.');
         }
       });
   }, [tournamentName, location, category, playoffDivision, headReferee, headSecretary, players, playerDirectory, playerNumberBook, scores, scoreSubmission, competitionDivisions, passwordProtectionEnabled, assistantScoringEnabled]);
@@ -3266,20 +3286,6 @@ const ReportPaperFinalBlock = ({ title, match }) => (
         rounds={match.roundsP2}
         isWinner={match.winner?.id === match.p2.id}
       />
-    </div>
-  </article>
-);
-
-const ReportPaperPlaceBlock = ({ title, position, player }) => (
-  <article className="report-final-block report-final-block--place">
-    <div className="report-final-block__title">
-      {title}
-    </div>
-    <div className="report-final-block__body">
-      <div className="report-place-row">
-        <span className="report-place-row__position">{position}</span>
-        <span className="report-place-row__name">{player?.name || 'Аныктала элек'}</span>
-      </div>
     </div>
   </article>
 );

@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+backup-before-tournament-fixes/
+backend/data/
+.tmp-five-check/
 
 # Environment variables
 .env

@@ -136,8 +136,8 @@ export default function AssistantGate() {
                 type="button"
                 className="password-toggle"
                 onClick={() => setShowPassword((current) => !current)}
-                aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
-                title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                aria-label={showPassword ? 'Паролду жашыруу' : 'Паролду көрсөтүү'}
+                title={showPassword ? 'Паролду жашыруу' : 'Паролду көрсөтүү'}
               >
                 {showPassword ? '🙈' : '👁️'}
               </button>
@@ -145,7 +145,7 @@ export default function AssistantGate() {
           </label>
 
           <button type="submit" className="primary-button auth-form__submit">
-            Вход
+            Кирүү
           </button>
 
           {authMessage && <p className="message-line message-line--auth">{authMessage}</p>}

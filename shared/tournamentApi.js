@@ -5,10 +5,11 @@ const TOURNAMENT_SYNC_KEY = 'tournament_state_sync_v1'
 let apiBlockedUntil = 0
 let lastApiErrorMessage = ''
 
-const createApiError = (message, code = 'API_ERROR', status = null) => {
+const createApiError = (message, code = 'API_ERROR', status = null, extra = {}) => {
   const error = new Error(message)
   error.code = code
   error.status = status
+  Object.assign(error, extra)
   return error
 }
 
@@ -53,7 +54,11 @@ const request = async (path, options = {}) => {
       throw markApiUnavailable(message, response.status)
     }
 
-    throw createApiError(message, 'API_ERROR', response.status)
+    throw createApiError(message, response.status === 409 ? 'STATE_CONFLICT' : 'API_ERROR', response.status, {
+      payload: parsedPayload,
+      currentState: parsedPayload?.currentState,
+      currentVersion: parsedPayload?.currentVersion,
+    })
   }
 
   apiBlockedUntil = 0

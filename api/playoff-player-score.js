@@ -8,6 +8,7 @@ const EMPTY_BRACKET = {
   semiFinals: [],
   fifthPlaceSemiFinals: [],
   fifthPlaceFinal: null,
+  fifthPlaceSentToReport: false,
   final12: null,
   final34: null,
   winners: [],
@@ -23,6 +24,8 @@ const PLAYOFF_DIVISION_META_KEY = '__playoffDivision'
 const PLAYOFF_FINAL_ROUNDS_META_KEY = '__playoffFinalRounds'
 const COMPETITION_DIVISIONS_META_KEY = '__competitionDivisions'
 const PASSWORD_PROTECTION_META_KEY = '__passwordProtectionEnabled'
+const STATE_VERSION_META_KEY = '__stateVersion'
+const STATE_UPDATED_AT_META_KEY = '__stateUpdatedAt'
 const PLAYOFF_SUBMISSION_STAGES = ['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final', 'fifthPlace']
 const PLAYOFF_STAGE_KEYS_BY_MODE = {
   32: ['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals'],
@@ -39,6 +42,7 @@ function createEmptyBracket() {
     semiFinals: [],
     fifthPlaceSemiFinals: [],
     fifthPlaceFinal: null,
+    fifthPlaceSentToReport: false,
     final12: null,
     final34: null,
     winners: [],
@@ -137,6 +141,8 @@ const extractPlayerNumberBook = (value) => {
   delete nextBook[PLAYOFF_FINAL_ROUNDS_META_KEY]
   delete nextBook[COMPETITION_DIVISIONS_META_KEY]
   delete nextBook[PASSWORD_PROTECTION_META_KEY]
+  delete nextBook[STATE_VERSION_META_KEY]
+  delete nextBook[STATE_UPDATED_AT_META_KEY]
   return nextBook
 }
 
@@ -160,6 +166,16 @@ const readStoredCompetitionDivisions = (dbRow) =>
 const readStoredPasswordProtectionEnabled = (dbRow) =>
   normalizePasswordProtectionEnabled(dbRow.player_number_book?.[PASSWORD_PROTECTION_META_KEY])
 
+const readStoredStateVersion = (dbRow) => {
+  const value = Number(dbRow.player_number_book?.[STATE_VERSION_META_KEY])
+  return Number.isInteger(value) && value >= 0 ? value : 0
+}
+
+const readStoredStateUpdatedAt = (dbRow) => {
+  const value = dbRow.player_number_book?.[STATE_UPDATED_AT_META_KEY]
+  return typeof value === 'string' || value === null ? value : null
+}
+
 const writeStoredPlayerNumberBook = (
   playerNumberBook,
   scoreSubmission,
@@ -167,6 +183,8 @@ const writeStoredPlayerNumberBook = (
   playoffFinalRounds,
   competitionDivisions,
   passwordProtectionEnabled,
+  version,
+  updatedAt,
 ) => ({
   ...(playerNumberBook || {}),
   [SCORE_SUBMISSION_META_KEY]: normalizeScoreSubmission(scoreSubmission),
@@ -174,6 +192,8 @@ const writeStoredPlayerNumberBook = (
   [PLAYOFF_FINAL_ROUNDS_META_KEY]: normalizePlayoffFinalRounds(playoffFinalRounds),
   [COMPETITION_DIVISIONS_META_KEY]: normalizeCompetitionDivisions(competitionDivisions),
   [PASSWORD_PROTECTION_META_KEY]: normalizePasswordProtectionEnabled(passwordProtectionEnabled),
+  [STATE_VERSION_META_KEY]: Number.isInteger(version) && version >= 0 ? version : 0,
+  [STATE_UPDATED_AT_META_KEY]: typeof updatedAt === 'string' || updatedAt === null ? updatedAt : null,
 })
 
 const dbToJs = (dbRow) => {
@@ -192,6 +212,8 @@ const dbToJs = (dbRow) => {
     playoffMode: legacyDivisionState.playoffMode,
     competitionDivisions,
     passwordProtectionEnabled: readStoredPasswordProtectionEnabled(dbRow),
+    version: readStoredStateVersion(dbRow),
+    updatedAt: readStoredStateUpdatedAt(dbRow),
     playerNumberBook: extractPlayerNumberBook(dbRow.player_number_book),
     scoreSubmission: readStoredScoreSubmission(dbRow),
   }
@@ -214,6 +236,8 @@ const jsToDb = (jsState) => {
       legacyDivisionState.playoffFinalRounds,
       competitionDivisions,
       jsState.passwordProtectionEnabled,
+      jsState.version,
+      jsState.updatedAt,
     ),
   }
 }
@@ -374,6 +398,59 @@ const rebuildBracketAfterStageEdit = (divisionState, changedStageKey) => {
     ...(divisionState.bracket || {}),
   }
 
+  const removeFifthPlaceFromReport = () => {
+    nextBracket.fifthPlaceSentToReport = false
+    nextBracket.winners = (nextBracket.winners || []).filter((entry) => entry.position !== 5)
+  }
+
+  const syncFifthPlaceBracket = () => {
+    const quarterFinalLosers = (nextBracket.quarterFinals || [])
+      .map((match) => {
+        const winner = resolveWinningPlayer(match)
+        if (!winner) return null
+        return winner.id === match.p1?.id ? match.p2 : match.p1
+      })
+      .filter(Boolean)
+
+    if (quarterFinalLosers.length !== 4) {
+      nextBracket.fifthPlaceSemiFinals = []
+      nextBracket.fifthPlaceFinal = null
+      removeFifthPlaceFromReport()
+      return
+    }
+
+    const existingSemiFinals = Array.isArray(nextBracket.fifthPlaceSemiFinals) ? nextBracket.fifthPlaceSemiFinals : []
+    const rebuiltSemiFinals = [
+      mergeMatchState(existingSemiFinals[0], createMatch('fifthPlaceSemiFinals-0', quarterFinalLosers[0], quarterFinalLosers[1]), true),
+      mergeMatchState(existingSemiFinals[1], createMatch('fifthPlaceSemiFinals-1', quarterFinalLosers[2], quarterFinalLosers[3]), true),
+    ]
+
+    rebuiltSemiFinals.forEach((match) => {
+      match.winner = resolveWinningPlayer(match)
+    })
+
+    const semiFinalsChanged =
+      existingSemiFinals.length !== rebuiltSemiFinals.length ||
+      rebuiltSemiFinals.some((match, index) => !sameMatchParticipants(existingSemiFinals[index], match))
+
+    nextBracket.fifthPlaceSemiFinals = rebuiltSemiFinals
+
+    const fifthPlaceWinners = rebuiltSemiFinals.map((match) => resolveWinningPlayer(match))
+    if (fifthPlaceWinners.length === 2 && fifthPlaceWinners.every(Boolean)) {
+      const existingFinal = nextBracket.fifthPlaceFinal
+      const fifthPlaceFinal = mergeMatchState(nextBracket.fifthPlaceFinal, createMatch('fifthPlaceFinal', fifthPlaceWinners[0], fifthPlaceWinners[1]), true)
+      fifthPlaceFinal.winner = resolveWinningPlayer(fifthPlaceFinal)
+      nextBracket.fifthPlaceFinal = fifthPlaceFinal
+
+      if (semiFinalsChanged || !sameMatchParticipants(existingFinal, fifthPlaceFinal)) {
+        removeFifthPlaceFromReport()
+      }
+    } else {
+      nextBracket.fifthPlaceFinal = null
+      removeFifthPlaceFromReport()
+    }
+  }
+
   const recalculateWinners = (markAsAutoRecalculated = false) => {
     const final12 = nextBracket.final12 ? { ...nextBracket.final12 } : null
     const final34 = nextBracket.final34 ? { ...nextBracket.final34 } : null
@@ -391,7 +468,14 @@ const rebuildBracketAfterStageEdit = (divisionState, changedStageKey) => {
     if (final12?.winner && final34?.winner) {
       const silver = final12.winner.id === final12.p1.id ? final12.p2 : final12.p1
       const fourth = final34.winner.id === final34.p1.id ? final34.p2 : final34.p1
-      const existingFifthEntry = (nextBracket.winners || []).find((entry) => entry.position === 5) || null
+      const existingFifthEntry =
+        nextBracket.fifthPlaceSentToReport && nextBracket.fifthPlaceFinal?.winner
+          ? {
+              position: 5,
+              player: nextBracket.fifthPlaceFinal.winner,
+              autoRecalculated: markAsAutoRecalculated,
+            }
+          : null
       nextBracket.winners = [
         { position: 1, player: final12.winner, autoRecalculated: markAsAutoRecalculated },
         { position: 2, player: silver, autoRecalculated: markAsAutoRecalculated },
@@ -405,20 +489,13 @@ const rebuildBracketAfterStageEdit = (divisionState, changedStageKey) => {
   }
 
   if (changedStageKey === 'final') {
+    syncFifthPlaceBracket()
     recalculateWinners(false)
     return nextBracket
   }
 
   if (changedStageKey === 'fifthPlace') {
-    const fifthPlaceSemiFinals = Array.isArray(nextBracket.fifthPlaceSemiFinals) ? nextBracket.fifthPlaceSemiFinals : []
-    const fifthPlaceWinners = fifthPlaceSemiFinals.map((match) => resolveWinningPlayer(match))
-    if (fifthPlaceWinners.length === 2 && fifthPlaceWinners.every(Boolean)) {
-      const fifthPlaceFinal = mergeMatchState(nextBracket.fifthPlaceFinal, createMatch('fifthPlaceFinal', fifthPlaceWinners[0], fifthPlaceWinners[1]), true)
-      fifthPlaceFinal.winner = resolveWinningPlayer(fifthPlaceFinal)
-      nextBracket.fifthPlaceFinal = fifthPlaceFinal
-    } else {
-      nextBracket.fifthPlaceFinal = null
-    }
+    syncFifthPlaceBracket()
     recalculateWinners(true)
     return nextBracket
   }
@@ -426,6 +503,7 @@ const rebuildBracketAfterStageEdit = (divisionState, changedStageKey) => {
   const stageOrder = getVisibleStageKeys(divisionState.playoffMode)
   const currentStageIndex = stageOrder.indexOf(changedStageKey)
   if (currentStageIndex < 0) {
+    syncFifthPlaceBracket()
     return nextBracket
   }
 
@@ -476,6 +554,7 @@ const rebuildBracketAfterStageEdit = (divisionState, changedStageKey) => {
   if (semiWinners.length !== 2 || semiLosers.length !== 2 || semiWinners.some((player) => !player) || semiLosers.some((player) => !player)) {
     nextBracket.final12 = null
     nextBracket.final34 = null
+    syncFifthPlaceBracket()
     nextBracket.winners = []
     return nextBracket
   }
@@ -489,6 +568,7 @@ const rebuildBracketAfterStageEdit = (divisionState, changedStageKey) => {
   nextBracket.final12 = final12Match
   nextBracket.final34 = final34Match
 
+  syncFifthPlaceBracket()
   recalculateWinners(true)
   return nextBracket
 }
@@ -566,8 +646,8 @@ export default async function handler(req, res) {
     }
 
     const isPlayerOne = activeMatch?.p1?.id === playerId
-    const updatedMatch = {
-      ...activeMatch,
+  const updatedMatch = {
+    ...activeMatch,
       roundsP1: Array.isArray(activeMatch.roundsP1) ? [...activeMatch.roundsP1] : Array(12).fill(0),
       roundsP2: Array.isArray(activeMatch.roundsP2) ? [...activeMatch.roundsP2] : Array(12).fill(0),
       submittedRoundsP1: Array.isArray(activeMatch.submittedRoundsP1) ? [...activeMatch.submittedRoundsP1] : Array(6).fill(false),
@@ -578,6 +658,7 @@ export default async function handler(req, res) {
       submittedShootOffP2: Boolean(activeMatch.submittedShootOffP2),
       autoRecalculated: false,
     }
+    const allowAssistantOverwrite = req.body?.source === 'assistant'
 
     if (divisionState.playoffStage === 'final') {
       const finalStageKey = activeMatch.id === 'final34' ? 'final34' : 'final12'
@@ -621,18 +702,27 @@ export default async function handler(req, res) {
       updatedMatch.s1_bot = updatedMatch.roundsP1.slice(6).reduce((sum, item) => sum + Number(item || 0), 0)
       updatedMatch.s2_bot = updatedMatch.roundsP2.slice(6).reduce((sum, item) => sum + Number(item || 0), 0)
     } else {
-      const useShootOff = shouldUseShootOffForStandardMatch(updatedMatch)
-      const submissionKey = useShootOff
-        ? isPlayerOne ? 'submittedShootOffP1' : 'submittedShootOffP2'
-        : isPlayerOne ? 'submittedP1' : 'submittedP2'
-
-      if (useShootOff) {
-        updatedMatch[isPlayerOne ? 'shootOffS1' : 'shootOffS2'] = score
-      } else {
+      if (allowAssistantOverwrite) {
         updatedMatch[isPlayerOne ? 's1' : 's2'] = score
-      }
+        updatedMatch[isPlayerOne ? 'submittedP1' : 'submittedP2'] = true
+        updatedMatch.shootOffS1 = 0
+        updatedMatch.shootOffS2 = 0
+        updatedMatch.submittedShootOffP1 = false
+        updatedMatch.submittedShootOffP2 = false
+      } else {
+        const useShootOff = shouldUseShootOffForStandardMatch(updatedMatch)
+        const submissionKey = useShootOff
+          ? isPlayerOne ? 'submittedShootOffP1' : 'submittedShootOffP2'
+          : isPlayerOne ? 'submittedP1' : 'submittedP2'
 
-      updatedMatch[submissionKey] = true
+        if (useShootOff) {
+          updatedMatch[isPlayerOne ? 'shootOffS1' : 'shootOffS2'] = score
+        } else {
+          updatedMatch[isPlayerOne ? 's1' : 's2'] = score
+        }
+
+        updatedMatch[submissionKey] = true
+      }
     }
 
     updatedMatch.winner = resolvePlayoffWinner(updatedMatch)
@@ -668,6 +758,8 @@ export default async function handler(req, res) {
 
     const nextState = {
       ...currentState,
+      version: currentState.version + 1,
+      updatedAt: new Date().toISOString(),
       competitionDivisions: {
         ...currentState.competitionDivisions,
         [divisionId]: updatedDivisionState,

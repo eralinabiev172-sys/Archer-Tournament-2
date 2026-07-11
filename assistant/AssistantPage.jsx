@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { fetchTournamentState, saveTournamentState, submitAssistantPlayoffPlayerScore } from '../shared/tournamentApi.js'
 import { useTheme } from '../shared/useTheme.js'
 
@@ -9,6 +9,7 @@ const EMPTY_BRACKET = {
   semiFinals: [],
   fifthPlaceSemiFinals: [],
   fifthPlaceFinal: null,
+  fifthPlaceSentToReport: false,
   final12: null,
   final34: null,
   winners: [],
@@ -92,6 +93,8 @@ const createEmptyCompetitionState = () => ({
 
 const createEmptyState = () => ({
   assistantScoringEnabled: false,
+  version: 0,
+  updatedAt: null,
   competitionDivisions: {
     all: createEmptyCompetitionState(),
     male: createEmptyCompetitionState(),
@@ -117,6 +120,8 @@ const normalizeState = (payload) => ({
   ...createEmptyState(),
   ...(payload || {}),
   assistantScoringEnabled: Boolean(payload?.assistantScoringEnabled),
+  version: Number.isInteger(payload?.version) && payload.version >= 0 ? payload.version : 0,
+  updatedAt: typeof payload?.updatedAt === 'string' || payload?.updatedAt === null ? payload.updatedAt : null,
   competitionDivisions: {
     all: normalizeCompetitionState(payload?.competitionDivisions?.all),
     male: normalizeCompetitionState(payload?.competitionDivisions?.male),
@@ -170,6 +175,9 @@ const mergeMatchState = (existingMatch, nextMatch) => {
     submittedShootOffP2: Boolean(existingMatch.submittedShootOffP2),
   }
 }
+
+const samePlayer = (left, right) => Boolean(left?.id && right?.id && left.id === right.id)
+const sameMatchParticipants = (left, right) => samePlayer(left?.p1, right?.p1) && samePlayer(left?.p2, right?.p2)
 
 const resolvePlayoffWinner = (match) => {
   if (!match) return null
@@ -244,6 +252,66 @@ const getQuarterFinalLosers = (bracket) =>
     })
     .filter(Boolean)
 
+const syncFifthPlaceBracketState = (bracket) => {
+  const nextBracket = { ...EMPTY_BRACKET, ...(bracket || {}) }
+  const removeFifthPlaceFromReport = () => {
+    nextBracket.fifthPlaceSentToReport = false
+    nextBracket.winners = (nextBracket.winners || []).filter((entry) => entry.position !== 5)
+  }
+
+  const losers = getQuarterFinalLosers(nextBracket)
+  if (losers.length !== 4) {
+    nextBracket.fifthPlaceSemiFinals = []
+    nextBracket.fifthPlaceFinal = null
+    removeFifthPlaceFromReport()
+    return nextBracket
+  }
+
+  const existingSemiFinals = Array.isArray(nextBracket.fifthPlaceSemiFinals) ? nextBracket.fifthPlaceSemiFinals : []
+  const rebuiltSemiFinals = [
+    mergeMatchState(existingSemiFinals[0], createMatch('fifthPlaceSemiFinals-0', losers[0], losers[1])),
+    mergeMatchState(existingSemiFinals[1], createMatch('fifthPlaceSemiFinals-1', losers[2], losers[3])),
+  ].map((match) => ({
+    ...match,
+    winner: resolvePlayoffWinner(finalizeStandardMatchForAdvance(match, resolvePlayoffWinner)),
+  }))
+
+  const semiFinalsChanged =
+    existingSemiFinals.length !== rebuiltSemiFinals.length ||
+    rebuiltSemiFinals.some((match, index) => !sameMatchParticipants(existingSemiFinals[index], match))
+
+  nextBracket.fifthPlaceSemiFinals = rebuiltSemiFinals
+
+  const semiFinalWinners = rebuiltSemiFinals.map((match) => match.winner).filter(Boolean)
+  if (semiFinalWinners.length === 2) {
+    const existingFinal = nextBracket.fifthPlaceFinal
+    const rebuiltFinal = mergeMatchState(existingFinal, createMatch('fifthPlaceFinal', semiFinalWinners[0], semiFinalWinners[1]))
+    const finalChanged = !sameMatchParticipants(existingFinal, rebuiltFinal)
+    nextBracket.fifthPlaceFinal = {
+      ...rebuiltFinal,
+      winner: resolvePlayoffWinner(finalizeStandardMatchForAdvance(rebuiltFinal, resolvePlayoffWinner)),
+    }
+
+    if (semiFinalsChanged || finalChanged) {
+      removeFifthPlaceFromReport()
+    }
+  } else {
+    nextBracket.fifthPlaceFinal = null
+    removeFifthPlaceFromReport()
+  }
+
+  if (nextBracket.fifthPlaceSentToReport && nextBracket.fifthPlaceFinal?.winner) {
+    nextBracket.winners = [
+      ...(nextBracket.winners || []).filter((entry) => entry.position !== 5),
+      { position: 5, player: nextBracket.fifthPlaceFinal.winner },
+    ].sort((left, right) => left.position - right.position)
+  } else {
+    removeFifthPlaceFromReport()
+  }
+
+  return nextBracket
+}
+
 const getStageMatches = (competitionState) => {
   if (!competitionState || competitionState.playoffStage === 'none') {
     return []
@@ -275,6 +343,14 @@ const getStageMatchesByKey = (competitionState, stageKey) => {
     return competitionState.bracket.fifthPlaceFinal
       ? [competitionState.bracket.fifthPlaceFinal]
       : (competitionState.bracket.fifthPlaceSemiFinals || [])
+  }
+
+  if (stageKey === 'fifthPlaceSemiFinals') {
+    return competitionState.bracket.fifthPlaceSemiFinals || []
+  }
+
+  if (stageKey === 'fifthPlaceFinal') {
+    return competitionState.bracket.fifthPlaceFinal ? [competitionState.bracket.fifthPlaceFinal] : []
   }
 
   return Array.isArray(competitionState.bracket?.[stageKey]) ? competitionState.bracket[stageKey] : []
@@ -345,6 +421,13 @@ export default function AssistantPage({ onLogout }) {
   const [statusMessage, setStatusMessage] = useState('')
   const [divisionMessage, setDivisionMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const stateVersionRef = useRef(0)
+  const stateUpdatedAtRef = useRef(null)
+
+  useEffect(() => {
+    stateVersionRef.current = Number.isInteger(tournamentState.version) ? tournamentState.version : 0
+    stateUpdatedAtRef.current = typeof tournamentState.updatedAt === 'string' || tournamentState.updatedAt === null ? tournamentState.updatedAt : null
+  }, [tournamentState.updatedAt, tournamentState.version])
 
   useEffect(() => {
     let isMounted = true
@@ -524,7 +607,10 @@ export default function AssistantPage({ onLogout }) {
   const canOpenFifthPlace = getQuarterFinalLosers(activeCompetitionState.bracket).length === 4
   const hasFifthPlaceBracket = Boolean((activeCompetitionState.bracket.fifthPlaceSemiFinals || []).length || activeCompetitionState.bracket.fifthPlaceFinal)
   const fifthPlaceWinner = activeCompetitionState.bracket.fifthPlaceFinal?.winner || null
-  const fifthPlaceSavedToReport = Boolean((activeCompetitionState.bracket.winners || []).some((entry) => entry.position === 5))
+  const fifthPlaceSavedToReport = Boolean(
+    activeCompetitionState.bracket.fifthPlaceSentToReport &&
+      (activeCompetitionState.bracket.winners || []).some((entry) => entry.position === 5),
+  )
   const fifthPlaceStages = [
     {
       id: 'fifthPlaceSemiFinals',
@@ -557,6 +643,7 @@ export default function AssistantPage({ onLogout }) {
           ...currentDivisionState,
           bracket: {
             ...currentDivisionState.bracket,
+            fifthPlaceSentToReport: true,
             winners: [
               ...(currentDivisionState.bracket.winners || []).filter((entry) => entry.position !== 5),
               { position: 5, player: resolvedFifthPlaceWinner },
@@ -577,15 +664,28 @@ export default function AssistantPage({ onLogout }) {
   const saveSelectedDivisionState = async (latestState, nextDivisionState, message) => {
     const nextState = normalizeState({
       ...latestState,
+      version: stateVersionRef.current,
+      updatedAt: stateUpdatedAtRef.current,
       competitionDivisions: {
         ...latestState.competitionDivisions,
         [selectedDivision]: normalizeCompetitionState(nextDivisionState),
       },
     })
-    const savedState = normalizeState(await saveTournamentState(nextState))
-    setTournamentState(savedState)
-    setStatusMessage(message)
-    return savedState
+    try {
+      const savedState = normalizeState(await saveTournamentState(nextState))
+      setTournamentState(savedState)
+      setStatusMessage(message)
+      return savedState
+    } catch (error) {
+      if (error?.code === 'STATE_CONFLICT' && error.currentState) {
+        const latestServerState = normalizeState(error.currentState)
+        setTournamentState(latestServerState)
+        setStatusMessage('Башка терезеде жаңы өзгөртүү сакталгандыктан бул бөлүм акыркы абал менен жаңыртылды.')
+        return latestServerState
+      }
+
+      throw error
+    }
   }
 
   const handleOpenFifthPlace = async () => {
@@ -598,42 +698,32 @@ export default function AssistantPage({ onLogout }) {
       }
 
       const currentDivisionState = normalizeCompetitionState(latestState.competitionDivisions?.[selectedDivision])
-      if ((currentDivisionState.bracket.fifthPlaceSemiFinals || []).length || currentDivisionState.bracket.fifthPlaceFinal) {
-        if (currentDivisionState.playoffStage !== 'fifthPlace') {
-          await saveSelectedDivisionState(
-            latestState,
-            {
-              ...currentDivisionState,
-              playoffStage: 'fifthPlace',
-            },
-            '5-РјРµСЃС‚Рѕ Р±РµС‚Рё Р°С‡С‹Р»РґС‹.',
-          )
-        }
-        setAssistantView('fifthPlace')
-        return
-      }
-      const losers = getQuarterFinalLosers(currentDivisionState.bracket)
-      if (losers.length !== 4) {
+      const resolvedQuarterFinalLosers = getQuarterFinalLosers(currentDivisionState.bracket)
+      const syncedFifthPlaceBracket = syncFifthPlaceBracketState(currentDivisionState.bracket)
+      const hasExistingFifthPlaceBracket = Boolean(
+        (currentDivisionState.bracket.fifthPlaceSemiFinals || []).length || currentDivisionState.bracket.fifthPlaceFinal,
+      )
+
+      if (resolvedQuarterFinalLosers.length !== 4 && !hasExistingFifthPlaceBracket) {
         setStatusMessage('5-место үчүн Топ-8деги 4 утулган оюнчу керек.')
         return
       }
 
-      const existingSemiFinals = currentDivisionState.bracket.fifthPlaceSemiFinals || []
-      await saveSelectedDivisionState(
-        latestState,
-        {
-          ...currentDivisionState,
-          playoffStage: 'fifthPlace',
-          bracket: {
-            ...currentDivisionState.bracket,
-            fifthPlaceSemiFinals: [
-              mergeMatchState(existingSemiFinals[0], createMatch('fifthPlaceSemiFinals-0', losers[0], losers[1])),
-              mergeMatchState(existingSemiFinals[1], createMatch('fifthPlaceSemiFinals-1', losers[2], losers[3])),
-            ],
+      const shouldSaveSyncedBracket =
+        currentDivisionState.playoffStage !== 'fifthPlace' ||
+        JSON.stringify(currentDivisionState.bracket) !== JSON.stringify(syncedFifthPlaceBracket)
+
+      if (shouldSaveSyncedBracket) {
+        await saveSelectedDivisionState(
+          latestState,
+          {
+            ...currentDivisionState,
+            playoffStage: 'fifthPlace',
+            bracket: syncedFifthPlaceBracket,
           },
-        },
-        '5-место ачылды.',
-      )
+          hasExistingFifthPlaceBracket ? '5-место жаңыртылды.' : '5-место ачылды.',
+        )
+      }
       setAssistantView('fifthPlace')
     } catch (error) {
       setStatusMessage(error.message || '5-место ачуу мүмкүн болгон жок.')
@@ -655,33 +745,15 @@ export default function AssistantPage({ onLogout }) {
       }
 
       const currentDivisionState = normalizeCompetitionState(latestState.competitionDivisions?.[selectedDivision])
+      const syncedBracket = syncFifthPlaceBracketState(currentDivisionState.bracket)
 
-      if (!hadFifthPlaceFinal && currentDivisionState.bracket.fifthPlaceFinal) {
-        setStatusMessage('5-РјРµСЃС‚РѕРЅСѓРЅ С„РёРЅР°Р»С‹ Р°С‡С‹Р»РґС‹.')
-        setAssistantView('fifthPlace')
-        return
-      }
-
-      if (!currentDivisionState.bracket.fifthPlaceFinal) {
-        const semiFinals = (currentDivisionState.bracket.fifthPlaceSemiFinals || []).map((match) =>
-          finalizeStandardMatchForAdvance(match, resolvePlayoffWinner),
-        )
-        const winners = semiFinals.map((match) => resolvePlayoffWinner(match))
-        if (semiFinals.length !== 2 || winners.some((winner) => !winner)) {
-          setStatusMessage('Адегенде 5-местонун эки беттешинин упайын толтуруңуз.')
-          return
-        }
-
+      if (!hadFifthPlaceFinal && syncedBracket.fifthPlaceFinal) {
         const savedState = await saveSelectedDivisionState(
           latestState,
           {
             ...currentDivisionState,
             playoffStage: 'fifthPlace',
-            bracket: {
-              ...currentDivisionState.bracket,
-              fifthPlaceSemiFinals: semiFinals,
-              fifthPlaceFinal: mergeMatchState(currentDivisionState.bracket.fifthPlaceFinal, createMatch('fifthPlaceFinal', winners[0], winners[1])),
-            },
+            bracket: syncedBracket,
           },
           '5-местонун финалы ачылды.',
         )
@@ -690,8 +762,13 @@ export default function AssistantPage({ onLogout }) {
         return
       }
 
+      if (!syncedBracket.fifthPlaceFinal) {
+        setStatusMessage('Адегенде 5-местонун эки беттешинин упайын толтуруңуз.')
+        return
+      }
+
       const normalizedFifthPlaceFinal = finalizeStandardMatchForAdvance(
-        currentDivisionState.bracket.fifthPlaceFinal,
+        syncedBracket.fifthPlaceFinal,
         resolvePlayoffWinner,
       )
       const fifthWinner = resolvePlayoffWinner(normalizedFifthPlaceFinal)
@@ -706,18 +783,16 @@ export default function AssistantPage({ onLogout }) {
           ...currentDivisionState,
           playoffStage: 'fifthPlace',
           bracket: {
-            ...currentDivisionState.bracket,
+            ...syncedBracket,
             fifthPlaceFinal: {
               ...normalizedFifthPlaceFinal,
               winner: fifthWinner,
             },
-            winners: [
-              ...(currentDivisionState.bracket.winners || []).filter((entry) => entry.position !== 5),
-              { position: 5, player: fifthWinner },
-            ].sort((left, right) => left.position - right.position),
+            fifthPlaceSentToReport: false,
+            winners: (syncedBracket.winners || []).filter((entry) => entry.position !== 5),
           },
         },
-        `${fifthWinner.name} 5-место алып, отчётко кошулду.`,
+        `${fifthWinner.name} 5-местону утту. Эми отчётко өзүнчө жөнөтсө болот.`,
       )
       setTournamentState(savedState)
       setAssistantView('fifthPlace')
@@ -727,7 +802,6 @@ export default function AssistantPage({ onLogout }) {
       setIsSaving(false)
     }
   }
-
   const handleAssistantToggle = async (nextValue) => {
     setIsSaving(true)
     try {
@@ -936,9 +1010,9 @@ export default function AssistantPage({ onLogout }) {
       })
       const savedState = normalizeState(await saveTournamentState(nextState))
       setTournamentState(savedState)
-      setStatusMessage(`????? ${finalKey === 'final34' ? '3-4' : '1-2'} ??????? ${safeRound} ??????.`)
+      setStatusMessage(`Финал ${finalKey === 'final34' ? '3-4' : '1-2'} үчүн A${safeRound} тандалды.`)
     } catch (error) {
-      setStatusMessage(error.message || '????????? ???????? ?????? ?????? ???.')
+      setStatusMessage(error.message || 'Финалдын айлампасын өзгөртүү мүмкүн болгон жок.')
     } finally {
       setIsSaving(false)
     }
@@ -988,7 +1062,7 @@ export default function AssistantPage({ onLogout }) {
     }
 
     if (submissions.length === 0) {
-      setStatusMessage('??????? ??????? ????, ????? ????????? ?? ? ????? ??????.')
+      setStatusMessage('Жөнөтө турган упай жок, адегенде маанилерди толтуруп коюңуз.')
       return null
     }
 
@@ -1009,10 +1083,10 @@ export default function AssistantPage({ onLogout }) {
           return nextDrafts
         })
       }
-      setStatusMessage('??????? ????? ??????? ?????????.')
+      setStatusMessage('Упайлар админ панелине жөнөтүлдү.')
       return nextState
     } catch (error) {
-      setStatusMessage(error.message || '????????? ??????? ?????? ?????? ???.')
+      setStatusMessage(error.message || 'Упайларды жөнөтүү мүмкүн болгон жок.')
       return null
     } finally {
       setIsSaving(false)
@@ -1123,7 +1197,7 @@ export default function AssistantPage({ onLogout }) {
               onClick={handleOpenFifthPlace}
               disabled={isSaving || (!canOpenFifthPlace && !hasFifthPlaceBracket)}
             >
-              {hasFifthPlaceBracket ? 'Войти на 5-место' : '5-место'}
+              {hasFifthPlaceBracket ? '5-местого өтүү' : '5-место'}
             </button>
             {isFifthPlaceView && (
               <button
@@ -1176,7 +1250,7 @@ export default function AssistantPage({ onLogout }) {
                     stageIndex={index}
                     matches={stage.matches}
                     isActive
-                    canEdit={activeCompetitionState.playoffStage === 'fifthPlace' && (stage.id === 'fifthPlaceFinal' || !activeCompetitionState.bracket.fifthPlaceFinal)}
+                    canEdit={activeCompetitionState.playoffStage === 'fifthPlace'}
                     scoreDrafts={scoreDrafts}
                     onDraftChange={setDraftForPlayer}
                     onScoreSubmit={handleBatchSubmit}
@@ -1381,7 +1455,7 @@ export default function AssistantPage({ onLogout }) {
               onClick={handleSaveDrafts}
               disabled={!assistantEnabled || isSaving || !hasPendingDrafts}
             >
-              Сохранить
+              Сактоо
             </button>
             <button
               type="button"
@@ -1389,7 +1463,7 @@ export default function AssistantPage({ onLogout }) {
               onClick={() => handleBatchSubmit(scoreDrafts)}
               disabled={!assistantEnabled || isSaving || !hasPendingDrafts}
             >
-              Отправить в админ панель
+              Админ панелге жөнөтүү
             </button>
             {isFifthPlaceView && fifthPlaceWinner && !fifthPlaceSavedToReport && (
               <button
@@ -1398,7 +1472,7 @@ export default function AssistantPage({ onLogout }) {
                 onClick={handleSendFifthPlaceToReport}
                 disabled={!assistantEnabled || isSaving}
               >
-                Отправить в отчёт
+                Отчётко жөнөтүү
               </button>
             )}
             <button
@@ -1424,7 +1498,7 @@ export default function AssistantPage({ onLogout }) {
                   : !['roundOf32', 'roundOf16', 'quarterFinals', 'semiFinals', 'final'].includes(activeCompetitionState.playoffStage))
               }
             >
-              Вперёд
+              Алга
             </button>
           </div>
         </section>

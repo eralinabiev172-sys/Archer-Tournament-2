@@ -7,6 +7,7 @@ const EMPTY_BRACKET = {
   semiFinals: [],
   fifthPlaceSemiFinals: [],
   fifthPlaceFinal: null,
+  fifthPlaceSentToReport: false,
   final12: null,
   final34: null,
   winners: [],
@@ -22,6 +23,8 @@ const PLAYOFF_DIVISION_META_KEY = '__playoffDivision'
 const PLAYOFF_FINAL_ROUNDS_META_KEY = '__playoffFinalRounds'
 const COMPETITION_DIVISIONS_META_KEY = '__competitionDivisions'
 const PASSWORD_PROTECTION_META_KEY = '__passwordProtectionEnabled'
+const STATE_VERSION_META_KEY = '__stateVersion'
+const STATE_UPDATED_AT_META_KEY = '__stateUpdatedAt'
 const DEFAULT_PASSWORD_PROTECTION_ENABLED = false
 
 function createEmptyBracket() {
@@ -32,6 +35,7 @@ function createEmptyBracket() {
     semiFinals: [],
     fifthPlaceSemiFinals: [],
     fifthPlaceFinal: null,
+    fifthPlaceSentToReport: false,
     final12: null,
     final34: null,
     winners: [],
@@ -56,9 +60,9 @@ function createDefaultCompetitionDivisions() {
 }
 
 const DEFAULT_STATE = {
-  tournamentName: 'Р–Р°Р° Р°С‚СѓСѓ Р±РѕСЋРЅС‡Р° С‚СѓСЂРЅРёСЂ',
-  location: 'Р§РѕР»РїРѕРЅ-РђС‚Р°, 2026-Р¶С‹Р»',
-  category: 'РљР»Р°СЃСЃРёРєР°Р»С‹Рє Р¶Р°Р°, 50 РјРµС‚СЂ, СЌСЂРєРµРєС‚РµСЂ',
+  tournamentName: 'Жаа атуу боюнча турнир',
+  location: 'Чолпон-Ата, 2026-жыл',
+  category: 'Классикалык жаа, 50 метр, эркектер',
   playoffDivision: 'all',
   headReferee: '',
   headSecretary: '',
@@ -71,6 +75,8 @@ const DEFAULT_STATE = {
     entries: [],
   },
   passwordProtectionEnabled: DEFAULT_PASSWORD_PROTECTION_ENABLED,
+  version: 0,
+  updatedAt: null,
 }
 
 const normalizeScoreSubmission = (value) => ({
@@ -138,6 +144,161 @@ const normalizeCompetitionDivisions = (value, legacy = {}) => {
   return defaults
 }
 
+const resolvePlayoffWinner = (match) => {
+  if (!match) return null
+  const isStandardMatch = !match.isFinal || match.id === 'fifthPlaceFinal'
+  const hasSubmissionTracking =
+    Object.prototype.hasOwnProperty.call(match, 'submittedP1') ||
+    Object.prototype.hasOwnProperty.call(match, 'submittedP2') ||
+    Object.prototype.hasOwnProperty.call(match, 'submittedShootOffP1') ||
+    Object.prototype.hasOwnProperty.call(match, 'submittedShootOffP2')
+
+  if (isStandardMatch && hasSubmissionTracking && (!match.submittedP1 || !match.submittedP2)) {
+    return null
+  }
+
+  if (Number(match.s1) > Number(match.s2)) return match.p1
+  if (Number(match.s2) > Number(match.s1)) return match.p2
+  if (isStandardMatch) {
+    if (hasSubmissionTracking && (!match.submittedShootOffP1 || !match.submittedShootOffP2)) {
+      return null
+    }
+    if (Number(match.shootOffS1) > Number(match.shootOffS2)) return match.p1
+    if (Number(match.shootOffS2) > Number(match.shootOffS1)) return match.p2
+    return null
+  }
+  if (Number(match.s1_bot) > Number(match.s2_bot)) return match.p1
+  if (Number(match.s2_bot) > Number(match.s1_bot)) return match.p2
+  return null
+}
+
+const createMatch = (id, p1, p2, isFinal = false) => ({
+  id,
+  p1,
+  p2,
+  s1: 0,
+  s2: 0,
+  shootOffS1: 0,
+  shootOffS2: 0,
+  s1_bot: 0,
+  s2_bot: 0,
+  winner: null,
+  isFinal,
+  roundsP1: Array(12).fill(0),
+  roundsP2: Array(12).fill(0),
+  submittedRoundsP1: Array(6).fill(false),
+  submittedRoundsP2: Array(6).fill(false),
+  submittedShootOffP1: false,
+  submittedShootOffP2: false,
+})
+
+const samePlayer = (left, right) => Boolean(left?.id && right?.id && left.id === right.id)
+const sameMatchParticipants = (left, right) =>
+  samePlayer(left?.p1, right?.p1) && samePlayer(left?.p2, right?.p2) && Boolean(left?.isFinal) === Boolean(right?.isFinal)
+
+const mergeMatchState = (existingMatch, nextMatch) => {
+  if (!existingMatch || !sameMatchParticipants(existingMatch, nextMatch)) {
+    return nextMatch
+  }
+
+  return {
+    ...nextMatch,
+    s1: existingMatch.s1,
+    s2: existingMatch.s2,
+    shootOffS1: existingMatch.shootOffS1,
+    shootOffS2: existingMatch.shootOffS2,
+    s1_bot: existingMatch.s1_bot,
+    s2_bot: existingMatch.s2_bot,
+    winner: existingMatch.winner,
+    roundsP1: Array.isArray(existingMatch.roundsP1) ? [...existingMatch.roundsP1] : [...nextMatch.roundsP1],
+    roundsP2: Array.isArray(existingMatch.roundsP2) ? [...existingMatch.roundsP2] : [...nextMatch.roundsP2],
+    submittedRoundsP1: Array.isArray(existingMatch.submittedRoundsP1) ? [...existingMatch.submittedRoundsP1] : [...nextMatch.submittedRoundsP1],
+    submittedRoundsP2: Array.isArray(existingMatch.submittedRoundsP2) ? [...existingMatch.submittedRoundsP2] : [...nextMatch.submittedRoundsP2],
+    submittedP1: Boolean(existingMatch.submittedP1),
+    submittedP2: Boolean(existingMatch.submittedP2),
+    submittedShootOffP1: Boolean(existingMatch.submittedShootOffP1),
+    submittedShootOffP2: Boolean(existingMatch.submittedShootOffP2),
+  }
+}
+
+const syncFifthPlaceBracket = (bracket) => {
+  const nextBracket = { ...createEmptyBracket(), ...(bracket || {}) }
+  const removeFifthPlaceFromReport = () => {
+    nextBracket.fifthPlaceSentToReport = false
+    nextBracket.winners = (nextBracket.winners || []).filter((entry) => entry.position !== 5)
+  }
+
+  const quarterFinalLosers = (nextBracket.quarterFinals || [])
+    .map((match) => {
+      const winner = resolvePlayoffWinner(match)
+      if (!winner) return null
+      return winner.id === match.p1?.id ? match.p2 : match.p1
+    })
+    .filter(Boolean)
+
+  if (quarterFinalLosers.length !== 4) {
+    nextBracket.fifthPlaceSemiFinals = []
+    nextBracket.fifthPlaceFinal = null
+    removeFifthPlaceFromReport()
+    return nextBracket
+  }
+
+  const existingSemiFinals = Array.isArray(nextBracket.fifthPlaceSemiFinals) ? nextBracket.fifthPlaceSemiFinals : []
+  const rebuiltSemiFinals = [
+    mergeMatchState(existingSemiFinals[0], createMatch('fifthPlaceSemiFinals-0', quarterFinalLosers[0], quarterFinalLosers[1])),
+    mergeMatchState(existingSemiFinals[1], createMatch('fifthPlaceSemiFinals-1', quarterFinalLosers[2], quarterFinalLosers[3])),
+  ].map((match) => ({
+    ...match,
+    winner: resolvePlayoffWinner(match),
+  }))
+
+  const semiFinalsChanged =
+    existingSemiFinals.length !== rebuiltSemiFinals.length ||
+    rebuiltSemiFinals.some((match, index) => !sameMatchParticipants(existingSemiFinals[index], match))
+
+  nextBracket.fifthPlaceSemiFinals = rebuiltSemiFinals
+
+  const semiFinalWinners = rebuiltSemiFinals.map((match) => match.winner).filter(Boolean)
+  if (semiFinalWinners.length === 2) {
+    const existingFinal = nextBracket.fifthPlaceFinal
+    const rebuiltFinal = mergeMatchState(existingFinal, createMatch('fifthPlaceFinal', semiFinalWinners[0], semiFinalWinners[1]))
+    const finalChanged = !sameMatchParticipants(existingFinal, rebuiltFinal)
+    nextBracket.fifthPlaceFinal = {
+      ...rebuiltFinal,
+      winner: resolvePlayoffWinner(rebuiltFinal),
+    }
+
+    if (semiFinalsChanged || finalChanged) {
+      removeFifthPlaceFromReport()
+    }
+  } else {
+    nextBracket.fifthPlaceFinal = null
+    removeFifthPlaceFromReport()
+  }
+
+  if (nextBracket.fifthPlaceSentToReport && nextBracket.fifthPlaceFinal?.winner) {
+    nextBracket.winners = [
+      ...(nextBracket.winners || []).filter((entry) => entry.position !== 5),
+      { position: 5, player: nextBracket.fifthPlaceFinal.winner },
+    ].sort((left, right) => left.position - right.position)
+  } else {
+    removeFifthPlaceFromReport()
+  }
+
+  return nextBracket
+}
+
+const syncCompetitionDivisionsFifthPlace = (competitionDivisions, legacy = {}) =>
+  Object.fromEntries(
+    Object.entries(normalizeCompetitionDivisions(competitionDivisions, legacy)).map(([divisionId, divisionState]) => [
+      divisionId,
+      {
+        ...divisionState,
+        bracket: syncFifthPlaceBracket(divisionState.bracket),
+      },
+    ]),
+  )
+
 const extractPlayerNumberBook = (value) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {}
@@ -149,6 +310,8 @@ const extractPlayerNumberBook = (value) => {
   delete nextBook[PLAYOFF_FINAL_ROUNDS_META_KEY]
   delete nextBook[COMPETITION_DIVISIONS_META_KEY]
   delete nextBook[PASSWORD_PROTECTION_META_KEY]
+  delete nextBook[STATE_VERSION_META_KEY]
+  delete nextBook[STATE_UPDATED_AT_META_KEY]
   return nextBook
 }
 
@@ -172,6 +335,16 @@ const readStoredCompetitionDivisions = (dbRow) =>
 const readStoredPasswordProtectionEnabled = (dbRow) =>
   normalizePasswordProtectionEnabled(dbRow.player_number_book?.[PASSWORD_PROTECTION_META_KEY])
 
+const readStoredStateVersion = (dbRow) => {
+  const value = Number(dbRow.player_number_book?.[STATE_VERSION_META_KEY])
+  return Number.isInteger(value) && value >= 0 ? value : 0
+}
+
+const readStoredStateUpdatedAt = (dbRow) => {
+  const value = dbRow.player_number_book?.[STATE_UPDATED_AT_META_KEY]
+  return typeof value === 'string' || value === null ? value : null
+}
+
 const writeStoredPlayerNumberBook = (
   playerNumberBook,
   scoreSubmission,
@@ -179,6 +352,8 @@ const writeStoredPlayerNumberBook = (
   playoffFinalRounds,
   competitionDivisions,
   passwordProtectionEnabled,
+  version,
+  updatedAt,
 ) => ({
   ...(playerNumberBook || {}),
   [SCORE_SUBMISSION_META_KEY]: normalizeScoreSubmission(scoreSubmission),
@@ -186,6 +361,8 @@ const writeStoredPlayerNumberBook = (
   [PLAYOFF_FINAL_ROUNDS_META_KEY]: normalizePlayoffFinalRounds(playoffFinalRounds),
   [COMPETITION_DIVISIONS_META_KEY]: normalizeCompetitionDivisions(competitionDivisions),
   [PASSWORD_PROTECTION_META_KEY]: normalizePasswordProtectionEnabled(passwordProtectionEnabled),
+  [STATE_VERSION_META_KEY]: Number.isInteger(version) && version >= 0 ? version : 0,
+  [STATE_UPDATED_AT_META_KEY]: typeof updatedAt === 'string' || updatedAt === null ? updatedAt : null,
 })
 
 const dbToJs = (dbRow) => {
@@ -209,6 +386,8 @@ const dbToJs = (dbRow) => {
     playoffMode: legacyDivisionState.playoffMode,
     competitionDivisions,
     passwordProtectionEnabled: readStoredPasswordProtectionEnabled(dbRow),
+    version: readStoredStateVersion(dbRow),
+    updatedAt: readStoredStateUpdatedAt(dbRow),
     playerNumberBook: extractPlayerNumberBook(dbRow.player_number_book),
     scoreSubmission: readStoredScoreSubmission(dbRow),
   }
@@ -238,6 +417,8 @@ const jsToDb = (jsState) => {
       legacyDivisionState.playoffFinalRounds,
       competitionDivisions,
       jsState.passwordProtectionEnabled,
+      jsState.version,
+      jsState.updatedAt,
     ),
   }
 }
@@ -289,13 +470,36 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'PUT') {
+      const { data: currentData, error: currentError } = await supabase
+        .from('tournament_state')
+        .select('*')
+        .eq('id', 'main')
+        .single()
+
+      if (currentError) {
+        console.error('Conflict check fetch error:', currentError)
+        return res.status(500).json({ error: currentError.message })
+      }
+
+      const currentState = dbToJs(currentData)
+      if (Number.isInteger(req.body?.version) && req.body.version !== currentState.version) {
+        return res.status(409).json({
+          error: 'Tournament state was updated in another session. Reload the latest data and try again.',
+          currentState,
+          currentVersion: currentState.version,
+        })
+      }
+
+      const syncedCompetitionDivisions = syncCompetitionDivisionsFifthPlace(req.body?.competitionDivisions, req.body)
       const nextState = {
         ...DEFAULT_STATE,
         ...req.body,
         playoffDivision: normalizePlayoffDivision(req.body?.playoffDivision),
         scoreSubmission: normalizeScoreSubmission(req.body?.scoreSubmission),
-        competitionDivisions: normalizeCompetitionDivisions(req.body?.competitionDivisions, req.body),
+        competitionDivisions: syncedCompetitionDivisions,
         passwordProtectionEnabled: normalizePasswordProtectionEnabled(req.body?.passwordProtectionEnabled),
+        version: currentState.version + 1,
+        updatedAt: new Date().toISOString(),
       }
 
       const { data, error } = await supabase
